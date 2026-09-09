@@ -13,6 +13,7 @@ const Session=preload("res://hunt/session.gd")
 const Economy=preload("res://hunt/economy.gd")
 const Stealth=preload("res://hunt/stealth.gd")
 const Sound=preload("res://scripts/sound.gd")
+const Touch=preload("res://hunt/touch.gd")
 var shutting_down=false
 var accepted_sessions=0
 var trail_history_received=false
@@ -31,6 +32,7 @@ var ui:CanvasLayer
 var camera:Camera3D
 var gun:Node3D
 var sound:Node
+var touch:CanvasLayer
 var clock=0.0
 var yaw=0.0
 var pitch=-.08
@@ -72,6 +74,10 @@ func _ready() -> void:
  camera=Camera3D.new();add_child(camera);camera.current=true;camera.far=260;camera.position=Vector3(13,8,35);camera.look_at(Vector3(0,1,12))
  gun=Forest.rifle(camera);gun.scale=Vector3.ONE*.7;gun.position=Vector3(.3,-.32,-.80);V.hand(gun,Vector3(.035,-.09,.02));var fore=V.hand(gun,Vector3(-.02,-.10,-.35));fore.rotation.y=1.0;preload("res://hunt/sculpt.gd").viewmodel(gun);gun.hide()
  ui=Hud.new();ui.game=self;add_child(ui)
+ touch=Touch.new();touch.game=self;add_child(touch)
+ # A finger cannot hold a button and drag to look at the same time, so hold-to-aim is not
+ # physically possible on a touchscreen. The trackpad toggle mode is the same solution.
+ if touch.active:aim_toggle=true
  multiplayer.connected_to_server.connect(func():local_id=multiplayer.get_unique_id();hello.rpc_id(1,C.PROTOCOL,C.VERSION,nickname))
  multiplayer.connection_failed.connect(func():end_session("Could not reach host. Check the address and that the host is running."))
  multiplayer.server_disconnected.connect(func():end_session("The host ended the hunt. Banked progress belongs to the host world."))
@@ -193,7 +199,10 @@ func _physics_process(dt:float) -> void:
  if bot_mode.is_empty():
   var enabled=not ui.panel.visible and capture_path.is_empty()
   var aim=aim_active() and enabled
-  submit_input(Input.get_vector("left","right","forward","back")*(.5 if aim else 1.0) if enabled else Vector2.ZERO,yaw,pitch,Input.is_action_pressed("jump") and enabled,Input.is_action_pressed("sprint") and enabled and not aim,aim,Input.is_action_pressed("crouch") and enabled)
+  var stick=touch.move if touch.active else Input.get_vector("left","right","forward","back")
+  var crouching=(Input.is_action_pressed("crouch") or touch.crouch) and enabled
+  var running=(Input.is_action_pressed("sprint") or touch.sprint) and enabled and not aim
+  submit_input(stick*(.5 if aim else 1.0) if enabled else Vector2.ZERO,yaw,pitch,Input.is_action_pressed("jump") and enabled,running,aim,crouching)
  if not is_host:return
  for a in avatars.values():
   if clock-a.last_input>.6:a.input_move=Vector2.ZERO;a.input_sprint=false;a.input_reel=false;a.input_crouch=false
@@ -236,6 +245,7 @@ func _process(dt:float) -> void:
    footstep+=dt
    if a.visual_speed>.4 and footstep>(.70 if a.crouched else (.30 if a.input_sprint else .48)):sound.tone("step",maxf(.12,a.noise));footstep=0
  ui.update(dt)
+ touch.show_controls(active and not ui.panel.visible)
  if not capture_path.is_empty():
   capture_elapsed+=dt
   if capture_elapsed>4 and DisplayServer.get_name()!="headless":
