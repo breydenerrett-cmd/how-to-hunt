@@ -1,0 +1,425 @@
+extends Node3D
+## Hunting orchestration. Reuses the fishing avatar, command gate, wire and storage layers.
+const C=preload("res://hunt/catalog.gd")
+const V=preload("res://scripts/visuals.gd")
+const Avatar=preload("res://scripts/avatar.gd")
+const Deer=preload("res://hunt/deer.gd")
+const Forest=preload("res://hunt/forest.gd")
+const Hud=preload("res://hunt/ui.gd")
+const Store=preload("res://scripts/save_store.gd")
+const Wire=preload("res://scripts/snapshot_wire.gd")
+const Gate=preload("res://scripts/action_gate.gd")
+const Sound=preload("res://scripts/sound.gd")
+var shutting_down=false
+var accepted_sessions=0
+var trail_history_received=false
+var active=false
+var is_host=false
+var online=false
+var local_id=1
+var nickname="Ranger"
+var avatars:Dictionary={}
+var animals:Dictionary={}
+var progress=C.new_progress()
+var store=Store.new()
+var wire=Wire.new()
+var forest:Node3D
+var ui:CanvasLayer
+var camera:Camera3D
+var gun:Node3D
+var sound:Node
+var clock=0.0
+var yaw=0.0
+var pitch=-.08
+var motion=.65
+var ui_scale=1.0
+var recoil=0.0
+var next_sequence=0
+var command_sequence=0
+var revision=0
+var last_revision=-1
+var last_inputs:Dictionary={}
+var last_commands:Dictionary={}
+var snapshot_timer=0.0
+var save_timer=0.0
+var join_started=-1.0
+var test_mode=false
+var bot_mode=""
+var capture_path=""
+var capture_elapsed=0.0
+var footstep=0.0
+var tracked_id=-1
+var tracked_until=0.0
+func _ready() -> void:
+ get_tree().auto_accept_quit=false;get_tree().multiplayer_poll=false;multiplayer.server_relay=false
+ for arg in OS.get_cmdline_user_args():
+  if arg=="--preview":store.disabled=true
+  if arg=="--test" and OS.has_feature("editor"):test_mode=true;store.disabled=true
+  if arg.begins_with("--bot=") and OS.has_feature("editor"):bot_mode=arg.trim_prefix("--bot=")
+  if arg.begins_with("--capture="):capture_path=arg.trim_prefix("--capture=");store.disabled=true
+ setup_inputs();load_settings()
+ forest=Forest.new();add_child(forest);sound=Sound.new();add_child(sound)
+ camera=Camera3D.new();add_child(camera);camera.current=true;camera.far=260;camera.position=Vector3(13,8,35);camera.look_at(Vector3(0,1,12))
+ gun=Forest.rifle(camera);gun.scale=Vector3.ONE*.7;gun.position=Vector3(.3,-.32,-.80);V.hand(gun,Vector3(.035,-.09,.02));var fore=V.hand(gun,Vector3(-.02,-.10,-.35));fore.rotation.y=1.0;preload("res://hunt/sculpt.gd").viewmodel(gun);gun.hide()
+ ui=Hud.new();ui.game=self;add_child(ui)
+ multiplayer.connected_to_server.connect(func():local_id=multiplayer.get_unique_id();hello.rpc_id(1,C.PROTOCOL,C.VERSION,nickname))
+ multiplayer.connection_failed.connect(func():end_session("Could not reach host. Check the address and that the host is running."))
+ multiplayer.server_disconnected.connect(func():end_session("The host ended the hunt. Banked progress belongs to the host world."))
+ multiplayer.peer_disconnected.connect(peer_left)
+ for arg in OS.get_cmdline_user_args():
+  if arg=="--solo":start_host(false,"Ranger",1)
+  if arg=="--host":start_host(true,"Host",3 if test_mode else 1)
+  if arg.begins_with("--join="):start_join(arg.trim_prefix("--join="),"Guest")
+ print("HUNT_BOOT ",C.VERSION," renderer=",RenderingServer.get_current_rendering_method())
+func setup_inputs() -> void:
+ var keys={"left":KEY_A,"right":KEY_D,"forward":KEY_W,"back":KEY_S,"jump":KEY_SPACE,"sprint":KEY_SHIFT,"interact":KEY_E,"pickup":KEY_F,"drop":KEY_Q,"reload":KEY_R,"journal":KEY_TAB,"pause":KEY_ESCAPE}
+ for action in keys:
+  if not InputMap.has_action(action):InputMap.add_action(action)
+  var ev=InputEventKey.new();ev.physical_keycode=keys[action];InputMap.action_add_event(action,ev)
+func load_settings() -> void:
+ var f=ConfigFile.new()
+ if f.load("user://settings.cfg")==OK:motion=clampf(float(f.get_value("controls","motion",.65)),0,1);ui_scale=clampf(float(f.get_value("controls","ui_scale",1)),1,1.2)
+func save_settings() -> void:
+ if store.disabled:return
+ var f=ConfigFile.new();f.set_value("controls","motion",motion);f.set_value("controls","ui_scale",ui_scale);f.save("user://settings.cfg")
+func start_host(networked:bool,player_name:String,slot:int) -> void:
+ if active:return
+ store.slot=slot;var loaded=store.load_world()
+ if loaded.is_empty():ui.main_menu(store.last_error);return
+ if networked:
+  var peer=ENetMultiplayerPeer.new()
+  if test_mode:peer.set_bind_ip("127.0.0.1")
+  var err=peer.create_server(C.PORT+1 if test_mode else C.PORT,3)
+  if err!=OK:ui.main_menu("Could not host (%d). Another hunt may be open."%err);return
+  multiplayer.multiplayer_peer=peer
+ else:multiplayer.multiplayer_peer=OfflineMultiplayerPeer.new()
+ active=true;is_host=true;online=networked;local_id=1;nickname=clean_name(player_name);progress=loaded
+ add_avatar(1,nickname);forest.reset_tracks()
+ if progress.animals.is_empty():seed_animals()
+ else:
+  for d in progress.animals:
+   var animal=spawn_animal(Vector3(d.p[0],d.p[1],d.p[2]),float(d.size),bool(d.elite),int(d.id));animal.hp=float(d.hp);animal.shots=int(d.shots);animal.base_value=int(d.value)
+ begin_view();note(1,"Welcome to Pinefall. Buy a rifle at the timber lodge, then follow the hoofprints.","quest");save_progress()
+ print("HUNT_HOST_READY online=",online)
+func start_join(address:String,player_name:String) -> void:
+ if active or join_started>=0:return
+ if address.strip_edges().is_empty() or address.length()>253:ui.menu_status.text="Enter the host address.";return
+ var peer=ENetMultiplayerPeer.new();var err=peer.create_client(address.strip_edges(),C.PORT+1 if test_mode else C.PORT)
+ if err!=OK:ui.menu_status.text="Could not start connection (%d)."%err;return
+ multiplayer.multiplayer_peer=peer;online=true;is_host=false;nickname=clean_name(player_name);join_started=clock;ui.menu_status.text="Connecting to the hunt…"
+@rpc("any_peer","call_remote","reliable",0)
+func hello(protocol:int,version:String,player_name:String) -> void:
+ if not is_host or not active:return
+ var id=multiplayer.get_remote_sender_id()
+ if protocol!=C.PROTOCOL or version!=C.VERSION:refuse.rpc_id(id,"Build mismatch. Everyone needs How to Hunt "+C.VERSION);return
+ if avatars.has(id):return
+ if avatars.size()>=4:refuse.rpc_id(id,"The hunt is full.");return
+ accepted_sessions+=1;add_avatar(id,clean_name(player_name));bootstrap.rpc_id(id,state_packet());receive_trail_history.rpc_id(id,forest.trail_snapshot());print("HUNT_PEER_ACCEPTED ",id)
+@rpc("authority","call_remote","reliable",0)
+func refuse(reason:String) -> void:end_session(reason)
+@rpc("authority","call_remote","reliable",0)
+func bootstrap(packet:Dictionary) -> void:
+ if is_host:return
+ active=true;join_started=-1;last_revision=-1;apply_state(packet);begin_view();print("HUNT_CLIENT_READY ",local_id)
+@rpc("authority","call_remote","reliable",0)
+func receive_trail_history(history:Array) -> void:
+ if is_host or not active:return
+ forest.restore_trails(history);trail_history_received=true
+func clean_name(value:String) -> String:
+ var s=value.strip_edges().replace("\n","").replace("\r","").left(20);return "Ranger" if s.is_empty() else s
+func begin_view() -> void:
+ yaw=0;pitch=-.08;ui.in_game()
+ if avatars.has(local_id):avatars[local_id].body_root.hide();avatars[local_id].name_label.hide()
+func add_avatar(id:int,label:String) -> Node3D:
+ if avatars.has(id):return avatars[id]
+ var a=Avatar.new();a.peer_id=id;a.display_name=label;a.name="Player_%d"%id;add_child(a);a.position=C.CAMP+Vector3((avatars.size()%4)*1.1,0,0);a.target_position=a.position;a.previous_position=a.position;a.last_input=clock;a.magazines={"rifle":mini(4,int(progress.ammo))};a.fishing={"steady":0.0};avatars[id]=a;return a
+func seed_animals() -> void:
+ for i in range(5):
+  var positions=[Vector2(5,-5),Vector2(-16,-28),Vector2(26,-52),Vector2(-30,-62),Vector2(2,-79)]
+  var p:Vector2=positions[i];spawn_animal(forest.point(p.x,p.y)+Vector3.UP*.1,.90+i*.11)
+func spawn_animal(p:Vector3,size_value:float=1.0,elite:bool=false,id:int=-1) -> Node3D:
+ if id<0:progress.sequence=int(progress.sequence)+1;id=int(progress.sequence)
+ var animal=Deer.new();animal.entity_id=id;animal.authority=is_host;animal.size_factor=size_value;animal.elite=elite;animal.hp=160.0 if elite else 70.0;animal.base_value=150 if elite else int(35*size_value*size_value);animal.position=p;add_child(animal);animals[id]=animal;return animal
+func peer_left(id:int) -> void:
+ if not is_host:return
+ if avatars.has(id):drop(avatars[id]);avatars[id].queue_free();avatars.erase(id)
+ last_commands.erase(id);last_inputs.erase(id);save_progress()
+func end_session(reason:String="Hunt saved. Your camp will be waiting.") -> void:
+ if active and is_host:save_progress()
+ active=false;is_host=false;online=false;join_started=-1;trail_history_received=false;forest.reset_tracks();multiplayer.multiplayer_peer=OfflineMultiplayerPeer.new()
+ for a in avatars.values():a.queue_free()
+ for a in animals.values():a.queue_free()
+ avatars.clear();animals.clear();last_inputs.clear();last_commands.clear();wire=Wire.new();last_revision=-1;revision=0;gun.hide();ui.main_menu(reason)
+ camera.position=Vector3(13,8,35);camera.look_at(Vector3(0,1,12))
+func _notification(what:int) -> void:
+ if what==NOTIFICATION_WM_CLOSE_REQUEST:shutdown()
+func shutdown() -> void:
+ if shutting_down:return
+ shutting_down=true
+ if is_host and active:save_progress()
+ sound.stop_all()
+ if DisplayServer.get_name()!="headless":OS.delay_msec(100)
+ get_tree().quit()
+func _unhandled_input(event:InputEvent) -> void:
+ if not active or not bot_mode.is_empty() or not capture_path.is_empty():return
+ if event.is_action_pressed("pause") or event.is_action_pressed("journal"):
+  if ui.panel.visible:ui.panel.hide();Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+  else:ui.show_panel("journal")
+  return
+ if ui.panel.visible:return
+ if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
+  yaw-=event.relative.x*.0023;pitch=clampf(pitch-event.relative.y*.0023,-1.3,1.3)
+ if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:send_action("fire",{})
+ for action in ["interact","pickup","reload"]:
+  if event.is_action_pressed(action):send_action(action,{})
+ if event.is_action_pressed("drop"):send_action("drop",{})
+func _physics_process(dt:float) -> void:
+ multiplayer.poll()
+ if not active:return
+ if bot_mode.is_empty():
+  var enabled=not ui.panel.visible and capture_path.is_empty()
+  var aim=Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and enabled
+  submit_input(Input.get_vector("left","right","forward","back")*(.5 if aim else 1.0) if enabled else Vector2.ZERO,yaw,pitch,Input.is_action_pressed("jump") and enabled,Input.is_action_pressed("sprint") and enabled and not aim,aim)
+ if not is_host:return
+ for a in avatars.values():
+  if clock-a.last_input>.6:a.input_move=Vector2.ZERO;a.input_sprint=false;a.input_reel=false
+  a.server_step(dt,a.held>=0,.25 if "pack" in progress.upgrades else 0.0,false)
+  var gain=1.54 if "scope" in progress.upgrades else 1.0
+  a.fishing.steady=clampf(float(a.fishing.get("steady",0))+dt*gain if a.input_reel and a.visual_speed<2.4 else 0,0,1)
+  if a.reload_until>0 and clock>=a.reload_until:a.magazines.rifle=mini(4,int(progress.ammo));a.reload_until=0
+  if a.health<=0 and a.down_time>3:
+   drop(a);a.health=100;a.position=C.CAMP;a.velocity=Vector3.ZERO;note(a.peer_id,"Back at camp. Banked credits and equipment are safe.","quest")
+  if absf(a.position.x)>88 or a.position.z< -107 or a.position.z>69:a.position=C.CAMP;a.velocity=Vector3.ZERO
+ for animal in animals.values():animal.step(self,dt)
+ snapshot_timer+=dt
+ if snapshot_timer>=.05:
+  snapshot_timer=fmod(snapshot_timer,.05)
+  if online and multiplayer.get_peers().size()>0:
+   var packet=state_packet();var chunks=Wire.encode(packet)
+   for i in range(chunks.size()):receive_state.rpc(int(packet.revision),i,chunks.size(),chunks[i])
+ save_timer+=dt
+ if save_timer>=30:save_timer=0;save_progress()
+func _process(dt:float) -> void:
+ clock+=dt;recoil=maxf(0,recoil-dt*5)
+ if join_started>=0 and clock-join_started>12:end_session("Connection timed out. Confirm both computers have this hunting build and the host is running.")
+ if active:
+  for a in avatars.values():
+   if not is_host:a.client_step(dt,25 if a.peer_id==local_id else 18)
+   a.update_visual(dt)
+  for animal in animals.values():animal.visual_step(dt,motion)
+  var a=avatars.get(local_id)
+  if a:
+   var p=a.rendered_position() if is_host else a.position
+   camera.position=p+Vector3(0,1.58 if a.health>0 else .5,0);camera.rotation=Vector3(pitch,yaw,0)
+   camera.fov=lerpf(camera.fov,50.0 if a.input_reel and "scope" in progress.upgrades else (64.0 if a.input_reel else 82.0),1-exp(-9*dt))
+   gun.visible="rifle" in progress.upgrades and a.held<0 and a.health>0
+   gun.position=gun.position.lerp(Vector3(.04,-.28,-.92) if a.input_reel else Vector3(.3,-.32,-.80),1-exp(-10*dt))
+   gun.rotation=Vector3(recoil*.19+(-.45 if a.reload_until>clock else 0),0,sin(clock*2)*.008*motion)
+   gun.presentation(a.reload_until>clock,clock,"scope" in progress.upgrades,motion)
+   footstep+=dt
+   if a.visual_speed>.4 and footstep>(.30 if a.input_sprint else .48):sound.tone("step");footstep=0
+ ui.update(dt)
+ if not capture_path.is_empty():
+  capture_elapsed+=dt
+  if capture_elapsed>4 and DisplayServer.get_name()!="headless":
+   get_viewport().get_texture().get_image().save_png(capture_path);print("HUNT_CAPTURE ",capture_path);capture_path=""
+   if "--capture-quit" in OS.get_cmdline_user_args():shutdown()
+func submit_input(move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool) -> void:
+ next_sequence+=1
+ if is_host:accept_input(local_id,next_sequence,move,y,p,jump,sprint,aim)
+ elif active:player_input.rpc_id(1,next_sequence,move,y,p,jump,sprint,aim)
+@rpc("any_peer","call_remote","unreliable_ordered",1)
+func player_input(seq:int,move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool) -> void:
+ if is_host:accept_input(multiplayer.get_remote_sender_id(),seq,move,y,p,jump,sprint,aim)
+func accept_input(id:int,seq:int,move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool) -> void:
+ if not avatars.has(id) or seq<=int(last_inputs.get(id,-1)) or not move.is_finite() or not is_finite(y) or not is_finite(p):return
+ last_inputs[id]=seq;var a=avatars[id];a.input_move=move.limit_length(1);a.input_yaw=wrapf(y,-PI,PI);a.input_pitch=clampf(p,-1.3,1.3);a.input_jump=a.input_jump or jump;a.input_sprint=sprint;a.input_reel=aim;a.last_input=clock
+func state_packet() -> Dictionary:
+ revision+=1;var players=[];var wildlife=[]
+ for a in avatars.values():players.append(a.packet())
+ for animal in animals.values():wildlife.append(animal.packet())
+ var p=progress.duplicate(true);p.animals=[]
+ return {"revision":revision,"players":players,"animals":wildlife,"progress":p}
+@rpc("authority","call_remote","unreliable",2)
+func receive_state(rev:int,index:int,total:int,chunk:PackedByteArray) -> void:
+ if not active or is_host or rev<=last_revision:return
+ var p=wire.accept(rev,index,total,chunk)
+ if not p.is_empty():apply_state(p)
+func apply_state(packet:Dictionary) -> void:
+ if int(packet.revision)<=last_revision:return
+ last_revision=int(packet.revision);progress=packet.progress;var ids=[]
+ for d in packet.players:
+  var id=int(d.id);ids.append(id);var a=add_avatar(id,d.name);a.target_position=d.p;a.target_yaw=d.yaw;a.health=d.hp;a.held=int(d.held);a.visual_speed=d.speed;a.fishing=d.fish;a.magazines=d.magazines
+  # Reload remaining time is derived from a duration in future revisions; current packet uses a host-relative hint only.
+  a.reload_until=clock+.1 if float(d.reload_until)>0 else 0
+  if id==local_id:a.input_reel=Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and not ui.panel.visible;a.body_root.hide();a.name_label.hide()
+ for id in avatars.keys():
+  if id not in ids:avatars[id].queue_free();avatars.erase(id)
+ ids=[]
+ for d in packet.animals:
+  var id=int(d.id);ids.append(id);var a=animals.get(id)
+  if not a:a=spawn_animal(d.p,float(d.size),bool(d.elite),id)
+  a.target_position=d.p;a.target_yaw=d.yaw;a.hp=d.hp;a.state=d.state;a.alert=d.alert;a.holder=int(d.holder);a.shots=int(d.shots);a.base_value=int(d.value);a.motion_speed=d.speed;a.charge_target=d.charge;a.head_pitch=float(d.get("head_pitch",0))
+ for id in animals.keys():
+  if id not in ids:animals[id].queue_free();animals.erase(id)
+func send_action(action:String,data:Dictionary) -> void:
+ if not active:return
+ command_sequence+=1
+ if is_host:accept_action(local_id,command_sequence,action,data)
+ else:action_request.rpc_id(1,command_sequence,action,data)
+@rpc("any_peer","call_remote","reliable",0)
+func action_request(seq:int,action:String,data:Dictionary) -> void:
+ if is_host:accept_action(multiplayer.get_remote_sender_id(),seq,action,data)
+func accept_action(id:int,seq:int,action:String,data:Dictionary) -> void:
+ if not active or not is_host or not avatars.has(id) or seq<=int(last_commands.get(id,-1)):return
+ last_commands[id]=seq;var a=avatars[id]
+ if a.health<=0 or a.action_gate.admit(clock,action,data)!=Gate.Admission.ACCEPT:return
+ match action:
+  "buy":buy(a,str(data.get("upgrade","")))
+  "fire":fire(a)
+  "reload":
+   if "rifle" in progress.upgrades and a.reload_until<=0 and progress.ammo>0 and int(a.magazines.get("rifle",0))<4:a.reload_until=clock+1.4;note(id,"Working the bolt. Reloading…","click")
+  "interact":interact(a)
+  "pickup":pickup(a)
+  "drop":drop(a)
+ if action in ["buy","fire","interact","pickup","drop"]:save_progress()
+func buy(a:Node3D,id:String) -> void:
+ if not C.ITEMS.has(id) or a.position.distance_to(C.SHOP)>8:return
+ if id in progress.upgrades:note(a.peer_id,"Already owned by the hunting party.","error");return
+ if id!="rifle" and "rifle" not in progress.upgrades:note(a.peer_id,"Start with the trail rifle.","error");return
+ var cost=int(C.ITEMS[id].cost)
+ if progress.wallet<cost:note(a.peer_id,"Not enough credits. Bank a harvest at the exchange.","error");return
+ if id=="ammo" and int(progress.ammo)>9987:return
+ progress.wallet-=cost
+ if id=="ammo":progress.ammo+=12
+ else:progress.upgrades.append(id)
+ if id=="rifle":
+  progress.ammo+=12
+  for player in avatars.values():player.magazines.rifle=4
+ note(a.peer_id,C.ITEMS[id].name+" added to the party's kit.","sell")
+func fire(a:Node3D) -> void:
+ if "rifle" not in progress.upgrades or a.held>=0 or a.reload_until>clock or clock<a.next_shot:return
+ if int(a.magazines.get("rifle",0))<=0 or int(progress.ammo)<=0:note(a.peer_id,"Empty. [R] reload, or visit camp for ammunition.","error");return
+ a.next_shot=clock+(.52 if "rifle2" in progress.upgrades else .87);a.magazines.rifle-=1;progress.ammo-=1
+ var origin=a.position+Vector3.UP*1.58;var direction=Basis.from_euler(Vector3(a.input_pitch,a.input_yaw,0))*Vector3.FORWARD
+ var query=PhysicsRayQueryParameters3D.create(origin,origin+direction*85,5);query.collide_with_areas=true;var result=get_world_3d().direct_space_state.intersect_ray(query)
+ var end=origin+direction*85 if result.is_empty() else result.position
+ shot_fx(origin,end)
+ if online:shot_fx.rpc(origin,end)
+ for animal in animals.values():
+  if animal.hp>0 and animal.position.distance_to(a.position)<30:animal.alert=1;animal.threat_position=a.position
+ if result.is_empty() or not result.collider is Area3D:return
+ var animal=result.collider.get_parent()
+ if not animal.get_script()==Deer:return
+ if animal.hp<=0:return
+ var clean=float(a.fishing.get("steady",0))>=.85
+ var applied=animal.take_shot(85 if clean else 38)
+ if animal.hp<=0:animal.state="down";animal.velocity=Vector3.ZERO;note(a.peer_id,"CLEAN HARVEST • +25%" if animal.shots==1 else "Harvest secured. Follow the trail and press [F] to drag it.","catch")
+ elif animal.elite:note(a.peer_id,"EXPOSED HIT • %d damage"%int(applied) if animal.state=="recover" else "BRACED HIDE • reduced damage. Dodge the rush, then fire while it recovers.","hit")
+ else:note(a.peer_id,"Hit! Follow its hoofprints; steady aim hits harder.","hit")
+@rpc("authority","call_remote","unreliable",3)
+func shot_fx(start:Vector3,end:Vector3) -> void:
+ sound.tone("shot");recoil=1
+ var mesh=ImmediateMesh.new();mesh.surface_begin(Mesh.PRIMITIVE_LINES);mesh.surface_add_vertex(start);mesh.surface_add_vertex(end);mesh.surface_end()
+ var n=MeshInstance3D.new();add_child(n);n.mesh=mesh;n.material_override=V.material(Color("eacf9b"),.6)
+ var tween=create_tween();tween.tween_interval(.075);tween.tween_callback(n.queue_free)
+func nearest_animal(a:Node3D,dead:bool=true) -> Node3D:
+ var selected:Node3D=null;var distance=3.4
+ for animal in animals.values():
+  if dead and (animal.hp>0 or animal.holder>=0):continue
+  var d=animal.position.distance_to(a.position)
+  if d<distance:distance=d;selected=animal
+ return selected
+func pickup(a:Node3D) -> void:
+ if a.held>=0:return
+ var animal=nearest_animal(a)
+ if not animal:note(a.peer_id,"Move within reach of a downed deer, then press [F].","click");return
+ animal.holder=a.peer_id;a.held=animal.entity_id;note(a.peer_id,"Harvest secured. Drag it home to the game exchange.","click")
+func drop(a:Node3D) -> void:
+ if animals.has(a.held):animals[a.held].holder=-1
+ a.held=-1
+func interact(a:Node3D) -> void:
+ if a.position.distance_to(C.EXCHANGE)<4.2:
+  if animals.has(a.held):sell(a);return
+  note(a.peer_id,"Drag a harvested deer here, then press [E] to bank it.","click");return
+ if a.position.distance_to(C.SHOP)<8:
+  if "rifle" in progress.upgrades and progress.ammo==0 and progress.wallet<8:
+   progress.ammo=4;note(a.peer_id,"Camp recovery: four field rounds. Reload and try again.","quest");return
+  var id=display_for(a);open_shop(a.peer_id,id);return
+ var closest:Dictionary={};var distance=3.5
+ for track in forest.tracks:
+  var d=a.position.distance_to(track.p)
+  if d<distance:distance=d;closest=track
+ if not closest.is_empty():
+  var animal=animals.get(int(closest.id))
+  if not animal:
+   var first=animals.values();animal=first[0] if not first.is_empty() else null
+  if animal:track_hint(a.peer_id,animal.entity_id,animal.position,animal.state)
+  return
+ pickup(a)
+func sell(a:Node3D) -> void:
+ var animal=animals.get(a.held)
+ if not animal or animal.hp>0 or animal.holder!=a.peer_id:return
+ var amount=animal.value();var crown=animal.elite
+ animals.erase(animal.entity_id);animal.queue_free();a.held=-1;progress.wallet+=amount;progress.banked+=amount;progress.sold+=1
+ note(a.peer_id,"BANKED +%d credits • %d total"%[amount,int(progress.wallet)],"sell")
+ if progress.contract==0 and progress.sold>=2:
+  progress.contract=1;progress.wallet+=50;spawn_animal(forest.point(26,-64)+Vector3.UP*.1,1.55,true);note(a.peer_id,"Contract complete: +50 credits. Crownback spotted beyond the watchtower!","quest")
+ if crown and progress.contract==1:progress.contract=2;progress.wallet+=125;note(a.peer_id,"CROWNBACK CONTRACT COMPLETE • +125 credits. Pinefall is yours to explore.","win")
+ if animals.size()<5:spawn_animal(forest.point(-18+sin(progress.sequence)*25,-25-cos(progress.sequence)*20)+Vector3.UP*.1,.9+fmod(progress.sequence*.13,.5))
+func display_for(a:Node3D) -> String:
+ var best="";var score=.55
+ for id in forest.displays:
+  var delta=forest.displays[id].global_position-(a.position+Vector3.UP*1.4)
+  var dot=a.forward().dot(delta.normalized())
+  if delta.length()<5 and dot>score:score=dot;best=id
+ return best
+func open_shop(id:int,item:String) -> void:
+ if id==local_id:show_shop(item)
+ elif online:show_shop.rpc_id(id,item)
+@rpc("authority","call_remote","reliable",0)
+func show_shop(item:String) -> void:ui.show_panel("shop",item)
+func track_hint(id:int,animal_id:int,p:Vector3,state:String) -> void:
+ if id==local_id:show_track(animal_id,p,state)
+ elif online:show_track.rpc_id(id,animal_id,p,state)
+@rpc("authority","call_remote","reliable",0)
+func show_track(id:int,p:Vector3,state:String) -> void:
+ tracked_id=id;tracked_until=clock+20;var a=avatars.get(local_id);var dist=int(a.position.distance_to(p)) if a else 0
+ ui.notify("Fresh hoofprints • %dm away • %s. Wind blows toward the south-east."%[dist,state]);sound.tone("click")
+func add_track(p:Vector3,heading:float,id:int) -> void:
+ forest.add_track(p,heading,id)
+ if online:receive_track.rpc(p,heading,id)
+@rpc("authority","call_remote","reliable",0)
+func receive_track(p:Vector3,heading:float,id:int) -> void:forest.add_track(p,heading,id)
+func context_prompt() -> String:
+ var a=avatars.get(local_id)
+ if not a:return ""
+ if a.position.distance_to(C.EXCHANGE)<4.2:return "[E] bank your harvest at the exchange"
+ if a.position.distance_to(C.SHOP)<8:
+  var id=display_for(a);return "[E] inspect "+C.ITEMS[id].name if id!="" else "[E] browse the lodge's equipment"
+ for animal in animals.values():
+  if animal.elite and animal.hp>0 and animal.position.distance_to(a.position)<24:
+   if animal.state=="windup":return "CROWNBACK BRACES • Sidestep the orange lane!"
+   if animal.state=="recover":return "CROWNBACK EXPOSED • Full damage now!"
+ for animal in animals.values():
+  var delta=animal.position-a.position;delta.y=0
+  if animal.hp>0 and animal.state=="alert" and delta.length()<20 and a.forward().dot(delta.normalized())>.85:return "QUARRY ALERT • Keep still or move downwind."
+ if nearest_animal(a):return "[F] drag harvested deer"
+ if tracked_until>clock and animals.has(tracked_id):
+  var animal=animals[tracked_id];var delta=animal.position-a.position;var angle=wrapf(atan2(-delta.x,-delta.z)-yaw,-PI,PI)
+  var arrow="↑" if absf(angle)<.45 else ("↓" if absf(angle)>2.4 else ("←" if angle>0 else "→"))
+  return "TRAIL %s • %dm • %s"%[arrow,int(a.position.distance_to(animal.position)),animal.state.to_upper()]
+ for track in forest.tracks:
+  if a.position.distance_to(track.p)<3.5:return "[E] inspect fresh hoofprints"
+ return "Right mouse: steady aim • Left mouse: fire" if "rifle" in progress.upgrades else "Follow the trail back to the timber lodge"
+func note(id:int,text:String,tone:String="click") -> void:
+ if id==local_id:show_note(text,tone)
+ elif online:show_note.rpc_id(id,text,tone)
+@rpc("authority","call_remote","reliable",0)
+func show_note(text:String,tone:String) -> void:ui.notify(text);sound.tone(tone);print("HUNT_EVENT ",text)
+func save_progress() -> bool:
+ if not is_host or not active:return false
+ var p=progress.duplicate(true);p.animals=[]
+ for animal in animals.values():p.animals.append(animal.saved())
+ if not store.save_world(p):note(local_id,store.last_error,"error");return false
+ return true

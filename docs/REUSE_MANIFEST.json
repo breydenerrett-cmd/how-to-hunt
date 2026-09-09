@@ -1,0 +1,15 @@
+{
+  "source": "Catch Catastrophe, the sibling fishing project",
+  "checkpoint": "5b526ee",
+  "files": {
+    "scripts/action_gate.gd": "adcbed2e9cebdbf1847281da6f959846c829feffd7363e64f66c6412ff06b80a",
+    "scripts/avatar.gd": "9833584b5c813d58382dfcf6bf7e08db84f4c938535d208201a5bcb4f6186389",
+    "scripts/coastal_plants.gd": "c4b64d1f8b5607e6c9c171929e580c5317920bb1d2d404dd26ab0afc909b22b7",
+    "scripts/save_store.gd": "8771fea9e7500e7f475926906419e3ff6225166c56104ec262b6015e02b1be84",
+    "scripts/snapshot_wire.gd": "cb40346cccd65770bbd3e5a52dc663dea8eb54ee9a9af722b2b6fed34e8c9f8f",
+    "scripts/sound.gd": "e2c4291b83fcc1cce1527db6f9512cc6715d9d9e2f2c40d126b10311668f1231",
+    "scripts/visuals.gd": "28e90ea9ca7306ab3efa95cd4b2babf6ea05d6cacef1e30671b00396e1027d09",
+    "shaders/surface.gdshader": "6ac7cd8a6581822a4dc0b7877296cb5fc556e7e23c9c22e9a471fd6695734517"
+  },
+  "scope": "Starting source copies; hunting adapters will diverge explicitly. Not a claim that the majority of the finished hunting gameplay already exists."
+}

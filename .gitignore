@@ -1,0 +1,12 @@
+.godot/
+.tools/
+exports/
+*.tmp
+*.log.tmp
+.DS_Store
+__pycache__/
+*.pyc
+
+# Local captures, screenshots and run logs. Development artifacts only:
+# large, and they record local machine paths. Must stay ignored.
+evidence/
