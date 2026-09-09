@@ -11,7 +11,7 @@ Owner changed the goal on 2026-09-08 to a distinct arcade hunting game reusing t
 | HUNT-05 | Useful gear, ammo choices and physical shopping | Rifle, field rounds, sight, harness, faster action; physical lodge displays. | Better physical selection/purchase feedback, pricing/progression, ammo UI clarity. Choose bounded additional weapon/ammo family after this loop is fun. Shared kit remains explicit. |
 | HUNT-06 | Distinct story and rewarding discovery | Pinefall introductory two-deer and Crownback contracts. | Original camp character, mystery/tracks/environmental storytelling and one meaningful next objective. Do not expand regions before service extraction and navigation quality. |
 | HUNT-07 | Persistent recoverable progress | Independent namespace/schema/identity; backup recovery passes. | Transaction durability/failure feedback, animal state restoration and human resume. No fishing-save writes. |
-| HUNT-08 | Architecture reusable without two drifting monoliths | Selected foundation copies tracked by original hashes. | Extract session/transaction interfaces from hunt/game.gd; version shared modules once real common behavior is proven. Do not claim a finished-game reuse percentage. |
+| HUNT-08 | Architecture reusable without two drifting monoliths | Selected foundation copies; first session/economy extraction implemented in0.1.3-dev. | Session lifecycle and scene-independent economy are separate; RPC/actor orchestration remains in game.gd. Version shared modules once real common behavior is proven. Do not claim a finished-game reuse percentage. |
 | HUNT-09 | More wildlife and survival/crafting | Deferred beyond first loop. | Deer first, then elk/birds with actual new behavior/rigs. Resource gathering, recipes, daily tree regrowth and thirst need separate authoritative systems and recovery rules. |
 | HUNT-10 | End-of-day playable milestone; end-of-week quality aspiration | First versioned hunting prototype being delivered. | Human quality, native platform and clean-install gates; update estimates from evidence. Steam release/publication, marketing and paid services remain unapproved. |
 | HUNT-11 | Deliberate stalking via a crouch stance | Absent; avatar has only sprint/walk. | Owner-requested. See docs/02_STEALTH_AND_REALISM_PLAN.md. Needs PROTOCOL bump. |
@@ -25,6 +25,8 @@ Latest0.1.1: HUNT-02 static routes/scent/alert/committed rush and counterattack 
 
 Latest0.1.2: HUNT-03 adds rounded original creatures and articulated poses, detailed rifle/reload, camp props and a cloud sky. This is one art pass, not the finished visual target. The cosmetic scope, forest composition, rocks and third-person weapons remain open.
 
-Next bounded session: inspect owner feedback if present; otherwise HUNT-08 session/economy extraction with targeted authority/save/network regressions, then HUNT-06 one original camp character and meaningful opening/replay objective. Preserve actual footsteps, collision, hitbox and reward tests. Keep the original arcade tone; avoid heavy survival chores until hunting is enjoyable.
+Latest development checkpoint: HUNT-08 first service extraction, with89 selected assertions and no new packaged release.
+
+Next bounded session: HUNT-11/12 owner-requested crouch and visible noise meter, with host authority, physical headroom and a protocol bump. Follow HUNT-13/14 quiet gear and shot falloff; HUNT-06 opening story remains planned. Preserve actual footsteps, collision, hitbox and reward tests. Keep the original arcade tone; avoid heavy survival chores until hunting is enjoyable.
 
 Hourly continuation uses the existing task automation. Keep meaningful milestone/failure/input notifications only, and avoid overlapping implementation or owner gameplay. The broader hunting goal remains active.

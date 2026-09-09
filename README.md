@@ -1,4 +1,6 @@
-# How to Hunt — Pinefall prototype v0.1.2
+# How to Hunt — Pinefall prototype
+
+Latest packaged playtest: **v0.1.2**. Current source: **0.1.3-dev**, session/economy extraction for the upcoming stalking milestone. Development source and packaged players have distinct version checks; use matching builds.
 
 An original arcade woodland hunt for one to four players. This first playable slice reuses selected support systems from Catch Catastrophe, with new terrain, animal behavior, hunting progression and an independent save identity. It is an early prototype, not a finished commercial game or a verified reference match.
 

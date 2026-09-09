@@ -1,5 +1,5 @@
 extends RefCounted
-const VERSION="0.1.2-hunt"
+const VERSION="0.1.3-dev"
 const PROTOCOL=1
 const PORT=27951
 const CAMP=Vector3(0,0.15,26)

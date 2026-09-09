@@ -1,3 +1,19 @@
+# Development checkpoint — session and economy extraction, 2026-09-08
+
+Current branch `codex/hunting-services`, source **0.1.3-dev**. Latest packaged playtest remains0.1.2; its archives are unchanged. This is source progress, not a new exported release or completed game. Protocol1 and schema1 remain unchanged; the development version rejects mixed release clients.
+
+HUNT-08 first extraction is implemented: `hunt/session.gd` handles hosting/joining, departure, teardown and save orchestration through an explicit scene context, without retaining a scene reference. Stable RPC endpoints and snapshots remain in `hunt/game.gd`, which still owns runtime actors/input/rendering. `hunt/economy.gd` owns catalogue-price purchase, bank/contract rewards and bankrupt ammunition recovery; it has no scene, network or storage dependencies. Host scene adapters consume unique harvests before feedback and spawning. This is a first module boundary, not a finished shared engine/library.
+
+Direct buy/sell adapters now require an active authoritative host, the registered living actor and local shop/exchange proximity. Foreign-held or repeated harvests cannot bank. Existing action sequence/payload gates and save behavior remain. No save schema migration or fishing changes.
+
+**89 selected assertions pass:** service12, rules31, storage10, earned route17 and four-process network19. Local ignored logs and hashes: `evidence/hunting_services/checks.json`. All include the extraction/guards; the source label was bumped afterward without gameplay changes. The earned route uses normal resources and real movement/rays:75.896seconds,373credits,eight rounds,health100,max step0.115856m. Local network covers host+three guests and reconnect, not new real-machine acceptance. No rendered-art or performance change is claimed; this source checkpoint is not exported.
+
+Additional service tests cover blocked guest/downed purchases, exchange distance, foreign holder, duplicate sale, independent party ledgers, full teardown and a fresh hunt in the same process. Save/backup and route tests retain their prior scope. Broad quality and human play remain open.
+
+The worktree contains newly registered owner stealth feedback in `docs/02_STEALTH_AND_REALISM_PLAN.md`. Preserve it. **Next priority: HUNT-11/12 crouch and a visible host-owned noise meter**, with the required input protocol bump, capsule/ceiling clearance, camera and guest replication checks. Follow with quiet gear/shot falloff before richer story. HUNT-06 remains on the backlog. Keep the full game goal active and preserve owner policy that local evidence stays ignored; no public actions or security/network changes were taken this session.
+
+---
+
 # Current hunting build — 0.1.2-hunt, 2026-09-08
 
 Continue `codex/hunting-art`, production checkpoint **6b6330f**. The broader hunting goal remains active. This is an original art and animation milestone, not a finished quality target. Godot 4.5.2 standard/Compatibility, hunting protocol 1, schema 1, independent saves and authoritative gameplay are preserved. Update the entire hunting party to 0.1.2 together. Fishing and sealed hunting 0.1.0/0.1.1 remain untouched.

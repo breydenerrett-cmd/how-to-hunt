@@ -9,6 +9,8 @@ const Hud=preload("res://hunt/ui.gd")
 const Store=preload("res://scripts/save_store.gd")
 const Wire=preload("res://scripts/snapshot_wire.gd")
 const Gate=preload("res://scripts/action_gate.gd")
+const Session=preload("res://hunt/session.gd")
+const Economy=preload("res://hunt/economy.gd")
 const Sound=preload("res://scripts/sound.gd")
 var shutting_down=false
 var accepted_sessions=0
@@ -83,30 +85,9 @@ func save_settings() -> void:
  if store.disabled:return
  var f=ConfigFile.new();f.set_value("controls","motion",motion);f.set_value("controls","ui_scale",ui_scale);f.save("user://settings.cfg")
 func start_host(networked:bool,player_name:String,slot:int) -> void:
- if active:return
- store.slot=slot;var loaded=store.load_world()
- if loaded.is_empty():ui.main_menu(store.last_error);return
- if networked:
-  var peer=ENetMultiplayerPeer.new()
-  if test_mode:peer.set_bind_ip("127.0.0.1")
-  var err=peer.create_server(C.PORT+1 if test_mode else C.PORT,3)
-  if err!=OK:ui.main_menu("Could not host (%d). Another hunt may be open."%err);return
-  multiplayer.multiplayer_peer=peer
- else:multiplayer.multiplayer_peer=OfflineMultiplayerPeer.new()
- active=true;is_host=true;online=networked;local_id=1;nickname=clean_name(player_name);progress=loaded
- add_avatar(1,nickname);forest.reset_tracks()
- if progress.animals.is_empty():seed_animals()
- else:
-  for d in progress.animals:
-   var animal=spawn_animal(Vector3(d.p[0],d.p[1],d.p[2]),float(d.size),bool(d.elite),int(d.id));animal.hp=float(d.hp);animal.shots=int(d.shots);animal.base_value=int(d.value)
- begin_view();note(1,"Welcome to Pinefall. Buy a rifle at the timber lodge, then follow the hoofprints.","quest");save_progress()
- print("HUNT_HOST_READY online=",online)
+ Session.start_host(self,networked,player_name,slot)
 func start_join(address:String,player_name:String) -> void:
- if active or join_started>=0:return
- if address.strip_edges().is_empty() or address.length()>253:ui.menu_status.text="Enter the host address.";return
- var peer=ENetMultiplayerPeer.new();var err=peer.create_client(address.strip_edges(),C.PORT+1 if test_mode else C.PORT)
- if err!=OK:ui.menu_status.text="Could not start connection (%d)."%err;return
- multiplayer.multiplayer_peer=peer;online=true;is_host=false;nickname=clean_name(player_name);join_started=clock;ui.menu_status.text="Connecting to the hunt…"
+ Session.start_join(self,address,player_name)
 @rpc("any_peer","call_remote","reliable",0)
 func hello(protocol:int,version:String,player_name:String) -> void:
  if not is_host or not active:return
@@ -141,16 +122,9 @@ func spawn_animal(p:Vector3,size_value:float=1.0,elite:bool=false,id:int=-1) -> 
  if id<0:progress.sequence=int(progress.sequence)+1;id=int(progress.sequence)
  var animal=Deer.new();animal.entity_id=id;animal.authority=is_host;animal.size_factor=size_value;animal.elite=elite;animal.hp=160.0 if elite else 70.0;animal.base_value=150 if elite else int(35*size_value*size_value);animal.position=p;add_child(animal);animals[id]=animal;return animal
 func peer_left(id:int) -> void:
- if not is_host:return
- if avatars.has(id):drop(avatars[id]);avatars[id].queue_free();avatars.erase(id)
- last_commands.erase(id);last_inputs.erase(id);save_progress()
+ Session.peer_left(self,id)
 func end_session(reason:String="Hunt saved. Your camp will be waiting.") -> void:
- if active and is_host:save_progress()
- active=false;is_host=false;online=false;join_started=-1;trail_history_received=false;forest.reset_tracks();multiplayer.multiplayer_peer=OfflineMultiplayerPeer.new()
- for a in avatars.values():a.queue_free()
- for a in animals.values():a.queue_free()
- avatars.clear();animals.clear();last_inputs.clear();last_commands.clear();wire=Wire.new();last_revision=-1;revision=0;gun.hide();ui.main_menu(reason)
- camera.position=Vector3(13,8,35);camera.look_at(Vector3(0,1,12))
+ Session.end_session(self,reason)
 func _notification(what:int) -> void:
  if what==NOTIFICATION_WM_CLOSE_REQUEST:shutdown()
 func shutdown() -> void:
@@ -284,19 +258,11 @@ func accept_action(id:int,seq:int,action:String,data:Dictionary) -> void:
   "drop":drop(a)
  if action in ["buy","fire","interact","pickup","drop"]:save_progress()
 func buy(a:Node3D,id:String) -> void:
- if not C.ITEMS.has(id) or a.position.distance_to(C.SHOP)>8:return
- if id in progress.upgrades:note(a.peer_id,"Already owned by the hunting party.","error");return
- if id!="rifle" and "rifle" not in progress.upgrades:note(a.peer_id,"Start with the trail rifle.","error");return
- var cost=int(C.ITEMS[id].cost)
- if progress.wallet<cost:note(a.peer_id,"Not enough credits. Bank a harvest at the exchange.","error");return
- if id=="ammo" and int(progress.ammo)>9987:return
- progress.wallet-=cost
- if id=="ammo":progress.ammo+=12
- else:progress.upgrades.append(id)
- if id=="rifle":
-  progress.ammo+=12
+ if not active or not is_host or avatars.get(a.peer_id)!=a or a.health<=0:return
+ var result=Economy.purchase(progress,id,a.position.distance_to(C.SHOP)<=8)
+ if result.get("refill",false):
   for player in avatars.values():player.magazines.rifle=4
- note(a.peer_id,C.ITEMS[id].name+" added to the party's kit.","sell")
+ if not result.message.is_empty():note(a.peer_id,result.message,result.tone)
 func fire(a:Node3D) -> void:
  if "rifle" not in progress.upgrades or a.held>=0 or a.reload_until>clock or clock<a.next_shot:return
  if int(a.magazines.get("rifle",0))<=0 or int(progress.ammo)<=0:note(a.peer_id,"Empty. [R] reload, or visit camp for ammunition.","error");return
@@ -343,8 +309,8 @@ func interact(a:Node3D) -> void:
   if animals.has(a.held):sell(a);return
   note(a.peer_id,"Drag a harvested deer here, then press [E] to bank it.","click");return
  if a.position.distance_to(C.SHOP)<8:
-  if "rifle" in progress.upgrades and progress.ammo==0 and progress.wallet<8:
-   progress.ammo=4;note(a.peer_id,"Camp recovery: four field rounds. Reload and try again.","quest");return
+  if Economy.recover_ammo(progress):
+   note(a.peer_id,"Camp recovery: four field rounds. Reload and try again.","quest");return
   var id=display_for(a);open_shop(a.peer_id,id);return
  var closest:Dictionary={};var distance=3.5
  for track in forest.tracks:
@@ -358,14 +324,15 @@ func interact(a:Node3D) -> void:
   return
  pickup(a)
 func sell(a:Node3D) -> void:
+ if not active or not is_host or avatars.get(a.peer_id)!=a or a.health<=0 or a.position.distance_to(C.EXCHANGE)>=4.2:return
  var animal=animals.get(a.held)
  if not animal or animal.hp>0 or animal.holder!=a.peer_id:return
  var amount=animal.value();var crown=animal.elite
- animals.erase(animal.entity_id);animal.queue_free();a.held=-1;progress.wallet+=amount;progress.banked+=amount;progress.sold+=1
- note(a.peer_id,"BANKED +%d credits • %d total"%[amount,int(progress.wallet)],"sell")
- if progress.contract==0 and progress.sold>=2:
-  progress.contract=1;progress.wallet+=50;spawn_animal(forest.point(26,-64)+Vector3.UP*.1,1.55,true);note(a.peer_id,"Contract complete: +50 credits. Crownback spotted beyond the watchtower!","quest")
- if crown and progress.contract==1:progress.contract=2;progress.wallet+=125;note(a.peer_id,"CROWNBACK CONTRACT COMPLETE • +125 credits. Pinefall is yours to explore.","win")
+ # Remove the unique harvest before any feedback/contract side effect can re-enter.
+ animals.erase(animal.entity_id);animal.queue_free();a.held=-1
+ var result=Economy.bank(progress,amount,crown)
+ if result.spawn_crown:spawn_animal(forest.point(26,-64)+Vector3.UP*.1,1.55,true)
+ for message in result.notes:note(a.peer_id,message.message,message.tone)
  if animals.size()<5:spawn_animal(forest.point(-18+sin(progress.sequence)*25,-25-cos(progress.sequence)*20)+Vector3.UP*.1,.9+fmod(progress.sequence*.13,.5))
 func display_for(a:Node3D) -> String:
  var best="";var score=.55
@@ -418,8 +385,4 @@ func note(id:int,text:String,tone:String="click") -> void:
 @rpc("authority","call_remote","reliable",0)
 func show_note(text:String,tone:String) -> void:ui.notify(text);sound.tone(tone);print("HUNT_EVENT ",text)
 func save_progress() -> bool:
- if not is_host or not active:return false
- var p=progress.duplicate(true);p.animals=[]
- for animal in animals.values():p.animals.append(animal.saved())
- if not store.save_world(p):note(local_id,store.last_error,"error");return false
- return true
+ return Session.save_progress(self)

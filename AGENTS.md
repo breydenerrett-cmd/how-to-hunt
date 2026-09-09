@@ -13,6 +13,11 @@ Because the repository is public, never write absolute home paths (`/Users/<name
 local IP addresses or personal details into tracked files. Use repository-relative paths.
 `evidence/` is git-ignored for this reason and must stay ignored.
 
+README.md must keep its **Download and play** section (linking to `releases/latest`) and its
+**Copyright** section. Those are how the owner shares builds; do not drop them when updating
+the README for a new version. Publish snapshots with
+`tools/publish_public_snapshot.py`; see `docs/03_DEVELOPING_AND_PUBLISHING.md`.
+
 ## Owner feedback register
 
 `docs/02_STEALTH_AND_REALISM_PLAN.md` records owner-requested stealth and realism work as
