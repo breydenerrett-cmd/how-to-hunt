@@ -1,6 +1,6 @@
 # How to Hunt — Pinefall prototype
 
-Stalking build **v0.1.3**: hold **Ctrl or C** to crouch. All multiplayer players need this version (hunting protocol2).
+Local visual polish build **v0.1.5**: hold **Ctrl or C** to crouch. All multiplayer players need this version (hunting protocol2).
 
 An original arcade woodland hunt for one to four players. This first playable slice reuses selected support systems from Catch Catastrophe, with new terrain, animal behavior, hunting progression and an independent save identity. It is an early prototype, not a finished commercial game or a verified reference match.
 
@@ -10,17 +10,17 @@ An original arcade woodland hunt for one to four players. This first playable sl
 
 Mac and Windows archives are attached to every release. No Godot install, GitHub account or
 development tools are needed to play - download, unzip and run. That link always points at
-the newest release, so it is safe to bookmark and share.
+the newest published release, which may precede the local build above, so it is safe to bookmark and share.
 
 ## Play
 
-- Mac: unzip **How_To_Hunt_Mac_v0_1_3.zip**, then open **How to Hunt.app**. Apple Silicon and Intel are included; native launch was tested on Apple Silicon only. The app is ad-hoc signed, not notarized. If macOS blocks it, report the exact message; this build does not change security settings.
-- Windows: unzip **How_To_Hunt_Windows_v0_1_3.zip**, then open **HowToHunt/HowToHunt.exe**. Native Windows playtesting of this hunting build remains pending.
+- Mac: unzip **How_To_Hunt_Mac_v0_1_5.zip**, then open **How to Hunt.app**. Apple Silicon and Intel are included; exact exported-resource testing is recorded in VALIDATION.md; native Intel and full manual gameplay remain pending. The app is ad-hoc signed, not notarized. If macOS blocks it, report the exact message; this build does not change security settings.
+- Windows: unzip **How_To_Hunt_Windows_v0_1_5.zip**, then open **HowToHunt/HowToHunt.exe**. Native Windows playtesting of this hunting build remains pending.
 - Choose **PLAY SOLO**, or **HOST A HUNT**. Three hunting world slots are independent of fishing worlds. Normal launches save; preview/test/capture sessions disable saves.
 
 ## First hunt
 
-You start with 40 credits and empty hands. Walk to the timber **Pine & Powder** lodge on the left. Look at the rifle display and press **E** to inspect/buy the 25-credit trail rifle; it includes 12 shared rounds. The lodge also offers ammunition, a steadier sight, dragging harness and faster rifle action.
+You start with 40 credits and empty hands. Walk to the timber **Pine & Powder** lodge on the left. Look at the rifle display and press **E** to inspect/buy the 25-credit trail rifle; it includes 12 shared rounds. The lodge also offers ammunition, a steadier sight, dragging harness and faster rifle action. Its side shelves add **Softstep boots (35)**, **Wool overshirt (55)**, **Pine scent cover (40)** and **Muffled barrel (130)**. These are permanent shared party upgrades. Boots cut movement noise by40%; wool cuts it a further20% and sight range by15%; scent cover reduces scent range from9m to4m. The muffled barrel reduces shot sound range from30m to10m, but nearby impacts and hits still disturb wildlife.
 
 Follow the gold hoofprints out of camp. **E** inspects nearby tracks and gives a temporary direction/distance to the animal. Hold **Ctrl or C** to crouch and stalk. The **NOISE** meter shows how movement and trail/leaf litter affect your sound; stopping silences movement. Quiet is not invisible: nearby sight and upwind scent can still reveal you. You stay crouched beneath low ceilings until there is room to stand. Moving fast and approaching upwind raises suspicion. Hold **right mouse** to move quietly and steady your aim; the center dot turns gold when ready. **Left mouse** fires. A clean single-shot harvest earns 25% more than its ordinary base value. Unsteady shots do less damage; follow the hoofprints if the animal flees.
 

@@ -22,6 +22,8 @@ static func lodge(parent:Node3D) -> void:
  # Small brass compass emblem over the equipment rack.
  var ring=V.ring(root,Vector3(0,2.10,-2.36),.22,Color("c5a56b"));ring.rotation.x=PI/2
  for angle in [0,PI/2]:V.box(root,Vector3(0,2.10,-2.32),Vector3(.035,.36,.028),Color("e1c488")).rotation.z=angle
+ for node in root.get_children():
+  if node is MeshInstance3D and str(node.name).begins_with("Barrel"):preload("res://hunt/surface_families.gd").apply(node,"timber")
  S.batch_details(root,"LodgeDetailsBatch")
 static func exchange(parent:Node3D) -> void:
  var root=Node3D.new();parent.add_child(root);root.name="ExchangeCraftDetails"

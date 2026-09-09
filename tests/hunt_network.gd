@@ -54,13 +54,16 @@ func guest_flow() -> void:
  for i in range(45):game.submit_input(Vector2(.5,0),0,0,false,false,false,true);await physics_frame
  check(self_avatar.crouched and self_avatar.eye_height<1.1 and self_avatar.noise>0 and self_avatar.noise<.3,"guest receives host simulated crouch eye height and quiet movement")
  for i in range(20):game.submit_input(Vector2.ZERO,0,0,false,false,false,false);await physics_frame
- check(not self_avatar.crouched and self_avatar.noise<.02,"guest receives standing stance and silent stop")
+ if not await until(func():return not self_avatar.crouched and self_avatar.noise<.02,4.0):return
+ check(true,"guest receives standing stance and silent stop")
  if role!="guest0":
   var a=game.avatars[game.local_id];var before=a.position
   for i in range(40):game.submit_input(Vector2(1,0),0,0,false,false,false);await physics_frame
   check(a.position.distance_to(before)>1,"independent guest movement is host-simulated")
   if not await until(func():return game.progress.sold==1):return
   check(game.progress.wallet>=50,"other guest receives shared sale reward")
+  if not await until(func():return "boots" in game.progress.upgrades):return
+  check(true,"other guest receives earned shared stealth gear purchase")
   game.end_session();return
  if not await move_to(game.C.SHOP+Vector3(0,0,3)):return
  game.submit_input(Vector2.ZERO,0,0,false,false,false);game.send_action("buy",{"upgrade":"rifle"});game.action_request.rpc_id(1,game.command_sequence,"buy",{"upgrade":"rifle"})
@@ -85,9 +88,14 @@ func guest_flow() -> void:
  game.submit_input(Vector2.ZERO,0,0,false,false,false);game.send_action("interact",{})
  if not await until(func():return game.progress.sold==1):return
  check(game.progress.wallet>=50,"guest banks shared harvest reward")
+ if not await move_to(Vector3(0,0,24)):return
+ if not await move_to(game.C.SHOP+Vector3(0,0,3)):return
+ game.submit_input(Vector2.ZERO,0,0,false,false,false);game.send_action("buy",{"upgrade":"boots"})
+ if not await until(func():return "boots" in game.progress.upgrades):return
+ check(game.progress.wallet>=0,"guest buys stealth gear using earned harvest credits")
  game.end_session();await create_timer(.3).timeout;game.start_join("127.0.0.1","Rejoined")
  if not await until(func():return game.active):return
- check(game.progress.sold==1 and "rifle" in game.progress.upgrades,"rejoin restores host progression and equipment")
+ check(game.progress.sold==1 and "rifle" in game.progress.upgrades and "boots" in game.progress.upgrades,"rejoin restores host progression and equipment")
  if not await until(func():return game.trail_history_received):return
  check(game.forest.tracks.size()>9,"rejoin restores recent moving wildlife trails")
  game.end_session()

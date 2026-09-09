@@ -1,6 +1,6 @@
 # Stealth, noise and realism — owner-requested plan
 
-Implementation update0.1.3: HUNT-11/12 now implemented with Ctrl/C crouch, full-shape standing clearance, physical speeds, replicated eye height/noise, actual surface-dependent movement sound and HUD meter. Protocol2, schema1. Selected physical/network checks pass; human stealth balance remains unverified. The original design below is historical intent. HUNT-13 through HUNT-16 remain future work.
+Implementation update0.1.3: HUNT-11/12 now implemented with Ctrl/C crouch, full-shape standing clearance, physical speeds, replicated eye height/noise, actual surface-dependent movement sound and HUD meter. Protocol2, schema1. Selected physical/network checks pass; human stealth balance remains unverified. The original design below is historical intent. HUNT-13/14 are implemented in0.1.4: permanent shared boots/wool/scent cover and muffled barrel, with host distance falloff and physical-impact tests. HUNT-15/16 remain future work.
 
 Captured 2026-09-08 from direct owner feedback, written against the source at `7c300d5`
 (v0.1.2). Registered as HUNT-11 through HUNT-16. This is design input for a future bounded

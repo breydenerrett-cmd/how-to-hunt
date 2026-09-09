@@ -1,9 +1,11 @@
 extends Node3D
 ## Original trail rifle; all mechanism motion is cosmetic.
+const F=preload("res://hunt/surface_families.gd")
 const V=preload("res://scripts/visuals.gd")
 const S=preload("res://hunt/sculpt.gd")
 var bolt:Node3D
 var scope:Node3D
+var muffler:Node3D
 var was_reloading=false
 var reload_started=0.0
 func _ready() -> void:
@@ -13,10 +15,10 @@ func _ready() -> void:
  S.loft(self,"RecoilPad",[S.section(Vector3(0,-.07,.445),.071,.143),S.section(Vector3(0,-.07,.475),.072,.143)],Color("303d35"),Color.TRANSPARENT,20)
  var fore=S.loft(self,"Forestock",[S.section(Vector3(0,.018,-.14),.062,.067),S.section(Vector3(0,.015,-.4),.06,.055),S.section(Vector3(0,.034,-.59),.047,.039)],wood)
  grain(fore,wood)
- V.box(self,Vector3(0,.076,-.19),Vector3(.108,.12,.30),steel)
+ F.apply(V.box(self,Vector3(0,.076,-.19),Vector3(.108,.12,.30),steel),"metal")
  for z in [-.12,-.24]:V.box(self,Vector3(0,.143,z),Vector3(.06,.014,.035),Color("9fa497"))
- var barrel=V.cylinder(self,Vector3(0,.11,-.64),.027,.78,steel);barrel.rotation.x=PI/2;barrel.material_override.metallic=.65;barrel.material_override.roughness=.35
- var muzzle=V.cylinder(self,Vector3(0,.11,-1.04),.032,.035,Color("5b6964"));muzzle.rotation.x=PI/2
+ var barrel=V.cylinder(self,Vector3(0,.11,-.64),.027,.78,steel);barrel.rotation.x=PI/2;F.apply(barrel,"metal")
+ var muzzle=V.cylinder(self,Vector3(0,.11,-1.04),.032,.035,Color("5b6964"));muzzle.rotation.x=PI/2;F.apply(muzzle,"metal")
  var bore=V.cylinder(self,Vector3(0,.11,-1.061),.016,.002,Color("111d1b"));bore.rotation.x=PI/2
  for z in [-.43,-.58]:
   var band=V.ring(self,Vector3(0,.064,z),.063,steel);band.scale=Vector3(1,1.1,.28);band.rotation.x=PI/2
@@ -35,13 +37,20 @@ func _ready() -> void:
  scope=Node3D.new();add_child(scope);scope.position=Vector3(0,.23,-.20)
  for z in [-.10,.10]:
   V.box(scope,Vector3(0,-.045,z),Vector3(.07,.06,.032),steel)
- var optic=V.cylinder(scope,Vector3.ZERO,.046,.36,steel);optic.rotation.x=PI/2
+ var optic=V.cylinder(scope,Vector3.ZERO,.046,.36,steel);optic.rotation.x=PI/2;F.apply(optic,"metal")
  for z in [-.19,.19]:
   var rim=V.cylinder(scope,Vector3(0,0,z),.060,.06,steel);rim.rotation.x=PI/2
   var lens=V.cylinder(scope,Vector3(0,0,z+signf(z)*.032),.048,.003,Color("517e78"));lens.rotation.x=PI/2;lens.material_override.metallic=.5;lens.material_override.roughness=.15
  scope.hide()
-func presentation(reloading:bool,clock:float,has_scope:bool,motion:float) -> void:
+ muffler=Node3D.new();add_child(muffler)
+ var sleeve=V.cylinder(muffler,Vector3(0,.11,-1.13),.056,.25,Color("35413b"));sleeve.rotation.x=PI/2;F.apply(sleeve,"metal")
+ for z in [-1.23,-1.17,-1.11]:
+  var ring=V.ring(muffler,Vector3(0,.11,z),.056,Color("677363"));ring.rotation.x=PI/2;ring.scale.y=.2
+ var opening=V.cylinder(muffler,Vector3(0,.11,-1.257),.021,.003,Color("14221b"));opening.rotation.x=PI/2
+ muffler.hide()
+func presentation(reloading:bool,clock:float,has_scope:bool,motion:float,has_muffler:bool=false) -> void:
  scope.visible=has_scope
+ muffler.visible=has_muffler
  if reloading and not was_reloading:reload_started=clock
  was_reloading=reloading
  var cycle=sin(clampf((clock-reload_started)/1.4,0,1)*PI) if reloading else 0.0

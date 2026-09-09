@@ -69,12 +69,25 @@ func _ensure_backups() -> bool:
 					if valid and contents.length()<=65536: _validated_backups[suffix]=contents
 			file.close()
 		if valid: continue
+		# Healing from a corrupt primary would spread the damage into the recovery copies.
+		if not _readable(path()): continue
 		_validated_backups.erase(suffix)
 		var err=DirAccess.copy_absolute(ProjectSettings.globalize_path(path()),ProjectSettings.globalize_path(path()+suffix))
 		if err!=OK:
 			last_error="World is saved, but a recovery copy could not be repaired (%d)."%err
 			return false
 	return true
+
+func _readable(target:String) -> bool:
+	# A file only counts as a usable save or recovery copy if it still parses and validates.
+	var f=FileAccess.open(target,FileAccess.READ)
+	if not f: return false
+	var text=f.get_as_text()
+	var ok=f.get_error()==OK
+	f.close()
+	if not ok: return false
+	var parser=JSON.new()
+	return parser.parse(text)==OK and validate(parser.data)
 
 func _write_snapshot(contents:String) -> bool:
 	var temp = path()+".tmp"
@@ -84,12 +97,23 @@ func _write_snapshot(contents:String) -> bool:
 		return false
 	f.store_string(contents)
 	f.flush()
+	var write_error = f.get_error()
 	f.close()
+	if write_error != OK:
+		last_error = "Save could not be written (%d). Existing save preserved." % write_error
+		return false
+	# Never promote a temp file that cannot be read back and validated. A full disk or a
+	# truncated write would otherwise be renamed over a good save and reported as success.
+	if not _readable(temp):
+		last_error = "Save failed verification and was discarded. Existing save preserved."
+		return false
 	var absolute = ProjectSettings.globalize_path(path())
-	# Copy backups first. A rename failure never deletes the original.
-	if FileAccess.file_exists(path()+".bak"):
-		DirAccess.copy_absolute(absolute+".bak",absolute+".bak2")
-	if FileAccess.file_exists(path()):
+	# Rotate recovery copies only from a primary that still validates. Copying a corrupt
+	# primary would carry the damage into .bak, then .bak2, destroying every recovery
+	# generation within two saves — exactly when they are needed most.
+	if _readable(path()):
+		if FileAccess.file_exists(path()+".bak"):
+			DirAccess.copy_absolute(absolute+".bak",absolute+".bak2")
 		DirAccess.copy_absolute(absolute,absolute+".bak")
 	var err = DirAccess.rename_absolute(ProjectSettings.globalize_path(temp),absolute)
 	if err != OK:

@@ -1,6 +1,16 @@
 extends RefCounted
 
+const Th=preload("res://scripts/theme.gd")
+## Fixed rasterisation size for world text. Cost is one glyph atlas; the payoff is that
+## an 8pt shop tag and a 24pt sign are equally sharp. The font is MSDF, so magnifying
+## the atlas stays clean rather than going soft.
+const RASTER:=96
+
 static func surface(node:MeshInstance3D,color:Color,wood:bool=false) -> void:
+	if wood:
+		node.material_override=preload("res://hunt/surface_families.gd").material("timber",color)
+		node.set_meta("surface_family","timber")
+		return
 	var mat=ShaderMaterial.new()
 	mat.shader=preload("res://shaders/surface.gdshader")
 	mat.set_shader_parameter("base_color",color)
@@ -153,10 +163,18 @@ static func hand(parent:Node3D,pos:Vector3) -> Node3D:
 static func text3d(parent:Node3D, pos:Vector3, text:String, size:int=40, color:Color=Color("f4e8cc")) -> Label3D:
 	var l = Label3D.new()
 	l.text = text
-	l.font_size = size
-	l.pixel_size = 0.012
+	# Label3D rasterises at font_size then magnifies by pixel_size, so the old
+	# font_size=size meant an 11px raster blown up to world scale — hence unreadable
+	# shop tags. Rasterise at a fixed high size and derive pixel_size instead: the
+	# rendered world height is identical, at up to 12x the texel density.
+	l.font = Th.world_font()
+	l.font_size = RASTER
+	l.pixel_size = size * 0.012 / float(RASTER)
 	l.modulate = color
-	l.outline_size = 6
+	# Outline was a flat 6 regardless of size: 25% of the em at size 24 and 75% at
+	# size 8, which swallowed the small labels. Proportional to the raster instead.
+	l.outline_size = int(RASTER * 0.1)
+	l.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	l.outline_modulate = Color(0.018,0.045,0.055,0.92)
 	l.no_depth_test = false
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED

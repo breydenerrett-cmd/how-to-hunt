@@ -18,13 +18,16 @@ def main() -> None:
         "--headless-only", action="store_true",
         help="Check native exported menu/solo startup without creating a GUI window or capture; graphical runtime remains pending.",
     )
+    parser.add_argument("--background", action="store_true", help="Capture a minimized native app without bringing it to the foreground.")
     options = parser.parse_args()
+    if options.background and options.headless_only:
+        parser.error("Choose headless-only or background capture, not both")
     version, release_tag, evidence = release_identity()
     archive = ROOT / "exports/mac/HowToHunt.zip"
     export_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
     evidence.mkdir(parents=True, exist_ok=True)
     results = []
-    mode = "headless_native" if options.headless_only else "rendered_native"
+    mode = "headless_native" if options.headless_only else ("rendered_native_background" if options.background else "rendered_native")
     with tempfile.TemporaryDirectory(prefix=f"hunt-{release_tag}-export-") as folder:
         subprocess.run(["ditto", "-xk", str(archive), folder], check=True, timeout=30)
         app = Path(folder) / "How to Hunt.app"
@@ -50,8 +53,15 @@ def main() -> None:
                 ]
             if scene == "solo":
                 args.append("--solo")
-            with log.open("w") as output:
-                result = subprocess.run(args, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, timeout=40)
+            if options.background:
+                log.unlink(missing_ok=True)
+                # LaunchServices -g preserves the foreground owner playtest. The
+                # exported app writes its own log; open's exit status is not game proof.
+                args = ["open", "-g", "-n", "-W", str(app), "--args", "--minimized", "--log-file", str(log)] + args[1:]
+                result = subprocess.run(args, cwd=ROOT, capture_output=True, timeout=60)
+            else:
+                with log.open("w") as output:
+                    result = subprocess.run(args, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, timeout=40)
             output_text = log.read_text()
             valid = (
                 result.returncode == 0
@@ -71,7 +81,7 @@ def main() -> None:
                 valid = False
             if not valid:
                 raise RuntimeError(f"Exported {scene} {mode} validation failed; inspect {log}\n{output_text}")
-            entry = {"scene": scene, "exit_code": result.returncode, "log": log.name}
+            entry = {"scene": scene, "launcher_exit_code" if options.background else "exit_code": result.returncode, "log": log.name}
             if picture is not None:
                 entry["capture"] = picture.name
             results.append(entry)
@@ -93,7 +103,7 @@ def main() -> None:
         "scope": (
             "Headless native exported-resource startup only; no GUI window or screenshot. Graphical runtime and human gameplay remain pending. "
             if options.headless_only else
-            "Native exported-resource capture sessions only; not a full manual campaign. "
+            "Native exported-resource capture sessions only; not a full manual campaign. " + ("Minimized background launch; capture/log completion checked, launcher status is not the app exit code. " if options.background else "")
         ) + "World saving disabled. Tests only the current machine architecture; not another architecture or a clean-download Gatekeeper test.",
         "runs": results,
     }

@@ -1,5 +1,5 @@
 extends RefCounted
-const VERSION="0.1.3-hunt"
+const VERSION="0.1.6-hunt"
 const PROTOCOL=2
 const PORT=27951
 const CAMP=Vector3(0,0.15,26)
@@ -10,7 +10,11 @@ const ITEMS={
  "ammo":{"name":"12 field rounds","cost":8,"detail":"Shared ammunition • top up at camp"},
  "scope":{"name":"Clear-glass sight","cost":65,"detail":"Closer aimed view; steadies 35% faster"},
  "pack":{"name":"Dragging harness","cost":45,"detail":"Move 25% faster while bringing game home"},
- "rifle2":{"name":"Ranger action","cost":110,"detail":"40% faster bolt cycle • requires trail rifle"}
+ "rifle2":{"name":"Ranger action","cost":110,"detail":"40% faster bolt cycle • requires trail rifle"},
+ "boots":{"name":"Softstep boots","cost":35,"detail":"40% less movement noise • shared party upgrade"},
+ "overshirt":{"name":"Wool overshirt","cost":55,"detail":"20% less movement noise; 15% shorter sight detection range"},
+ "scent":{"name":"Pine scent cover","cost":40,"detail":"Permanent party kit • scent range 9m → 4m; wind still matters"},
+ "muffler":{"name":"Muffled barrel","cost":130,"detail":"Shot sound range 30m → 10m • impacts and direct hits still alert wildlife"}
 }
 static func new_progress() -> Dictionary:
  return {"schema":1,"game":"how_to_hunt","wallet":40,"upgrades":[],"ammo":0,"sold":0,"banked":0,"contract":0,"sequence":0,"animals":[]}

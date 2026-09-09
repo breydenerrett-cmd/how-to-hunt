@@ -1,3 +1,45 @@
+# Visual polish 0.1.5 — validation window
+
+Productionef3d619 includes the shared theme428669a and benchmark737cedf. Godot4.5.2 standard/Compatibility; protocol2/schema1. Local evidence under `evidence/hunting_materials/` and `evidence/release_v0_1_5/` remains ignored. This is a visual milestone, not complete-game or reference-quality acceptance.
+
+Earlier selected checks passed134 assertions: materials7,art13,rules31,gear16,services12,storage10,earned route17 and four-process network28. These precede the inherited UI theme and are historical until the frozen source is rerun. Route75.969seconds,373credits,eight rounds,health100,max step0.115727m. Materials test shared maps, local mipmapped triplanar mapping, distinct fur/metal response and batch geometry/colors/exclusions. Native720/1080 staged views were inspected; initial overly striped timber/bright lighting were reduced. Baseline/pass fixtures retain ObjectDB shutdown warnings; do not call every capture warning-free. Final UI/export evidence follows.
+
+Matched benchmark results and limitations are detailed at the top of HANDOFF.md. Original capped-only baselines are not compared to the newly added uncapped stage. Two new uncapped medians near7ms do not establish a speedup against a highly variable baseline. Short capped samples near16.65ms do not prove sustained60FPS. Drawcall/video-memory increases are retained, not hidden. Native Windows/Intel, clean installs, current home-Wi-Fi hunting, audio quality, human reward/stealth balance and long sessions remain open.
+
+Final production **046fee9** adds the guidance-layout correction toef3d619. The frozen material/theme source reran all **134 selected assertions**, failures0; five packaging units also pass. The final earned route took75.978seconds with373credits/eight rounds/health100 and max physics step0.115727m. Logs/source windows are in `evidence/release_v0_1_5/checks.json`; these checks precede only the final guidance-placement change. Final720/1080 native staged renders cover that change at120% interface scale: guidance stays outside the HUD panels and shop/journal panels hide the gameplay HUD. Representative corrected camp/purchase images were inspected. Oversized world landmark labels and hauling-camera obstruction remain open.
+
+An additional final frozen-source1080p sample gives uncapped median16.294ms,p9518.388ms; capped median16.652ms,p9517.621ms,359frames;1517draws/about114MB tracked video memory. Uncapped timings vary substantially across sessions, including the baseline. This does not establish a stable rendering cost or a speedup; capped timing alone cannot quantify headroom. Keep the limitations visible and measure representative combat/co-op before a performance claim. Final native exports, archive CRC and source-import receipts follow sealing.
+
+---
+
+# Current stealth gear build — 0.1.4-hunt, 2026-09-08
+
+Branch `codex/hunting-stealth-gear`, production **8d46b61**. Full hunting goal remains active. Godot4.5.2 standard/Compatibility, hunting protocol2 and schema1 are unchanged. Matching0.1.4 versions are required for party play; older packaged releases and fishing saves remain intact.
+
+**HUNT-13/14 implemented:** Softstep boots35 credits reduce movement noise40%; Wool overshirt55 reduces remaining movement noise20% and sight radius15%; Pine scent cover40 permanently reduces scent radius9→4m; Muffled barrel130 reduces shot sound radius30→10m. Purchases are permanent shared party upgrades. These add IDs without removing old IDs or changing schema1. Journal lists owned stalking kit and shop descriptions give the effects. No consumable scent timing, personal clothing inventory or visual clothing swaps are claimed.
+
+Host movement noise and wildlife sight/scent use the owned kit. Shots now add distance-dependent suspicion, with a separate6m local impact disturbance; a suppressed miss can alert quarry beside the actual surface hit. Near animals still hear muffled shots and direct hits retain their alert response. The first-person rifle gains a visible attachment, local shot playback is quieter, and impact sparks are presentation-only. This is an arcade suppression model, not real-world acoustics.
+
+Four original equipment props occupy reachable side shelves. Existing five rear displays remain, labels are lifted clear of new props and disappear beyond6.5m. Static gear surfaces are batched. Native staged720/1080 views cover both shelves, the purchase panel, journal and attached rifle, including120% HUD. Selected views and final batched720 were inspected. Camera-only fixture yaw initially left the interaction prompt aimed elsewhere; fixture input yaw now follows the camera. World/art quality and human interaction/audio appeal remain open.
+
+**140 selected assertions pass:** gear16,rules31,services12,storage10,earned route17,stalking15,charge11,network28. Local ignored log hashes/source windows: `evidence/release_v0_1_4/checks.json`. Gear tests use actual raycasts for unsuppressed/muffled shots and wall-impact misses, actual unique-slot write/reload for new item persistence, exact prices/duplicates and reachable prop checks. The earned route uses normal starting resources and real shots/movement:75.991seconds,373credits,eight rounds,health100,max step0.115727m. Four local processes buy boots with earned harvest credits, replicate them to both other guests and retain them on rejoin. No new home-Wi-Fi result is claimed.
+
+An initial journal local-variable conflict caused parse failure; it was corrected before selected runs. The first network run asserted standing after a fixed20 ticks before the guest had the update; a bounded wait now requires the actual replicated stance/noise and the rerun passes. This is a test timing correction, not a claimed latency fix. Failed logs remain local and are excluded.
+
+A six-second1080p sample measured median13.396ms but p95114.958/p99118.098ms,150frames,1389drawcalls. An owner0.1.3 game process was observed running afterward; this sample cannot establish an isolated performance comparison. It is retained as a poor sample, not discarded or presented as a win. After that observation, further graphical launches were avoided; the owner process was not stopped. Exact0.1.4 Mac verification uses headless native resource startup, not exported graphical gameplay. Native Windows/Intel, isolated performance, clean installs, long sessions and human stealth balance remain open.
+
+**Next:** honor newly registered HUNT-17/18 visual polish requests in `docs/04_VISUAL_POLISH_PLAN.md`: one measured lighting/material pass while preserving Compatibility and gameplay. Verify any renderer-specific claim before applying it. HUNT-15/16 changing wind/herd cues and HUNT-06 original story remain planned. Keep the full goal active. No purchases, publication, public servers, security/network changes or owner-save edits occurred; evidence stays local/ignored. Exact export/archive receipts follow sealing.
+
+Final8d46b61 exports complete. Exact Mac ad-hoc signature and nativearm64 headless menu/solo resource startup pass; graphical exported runtime is pending. Windows PE resources load through Mac Godot in an isolated directory, not native Windows. Five packaging metadata tests pass. Archive/source-integrity receipts follow.
+
+Sealed v0.1.4 Mac/Windows/source ZIPs pass CRC. Mac contains arm64/x86_64 and matching0.1.4 versions; nativearm64 headless menu/solo startup passes, graphical exact-export testing remains pending. Windows x86_64 PE/embedded pack passes structure and isolated Mac-engine resource loading, not Windows execution. Exact source matches all51 frozen runtime files and fresh-imports with pinned Godot4.5.2, exit0; local evidence is excluded. Archives contain documentation checkpointbc4706e; this sealing receipt is added afterward. SHA-256:
+
+- How_To_Hunt_Windows_v0_1_4.zip: `8397e69b4d18435383e04dd83c3c1326c5e190b4adc2632c2247cdcb6d059bba`
+- How_To_Hunt_Mac_v0_1_4.zip: `6f8f8f458ba4410a72ec3ea73548e3f7e2774baad7ab5a22d0879c3400073f4a`
+- How_To_Hunt_Source_v0_1_4.zip: `3a48564a356a3ab88b98970d712b11dbf1012fcabbc1c63ef35ad6d6bc5c0f13`
+
+---
+
 # Current stalking build — 0.1.3-hunt, 2026-09-08
 
 Branch `codex/hunting-stalking`, production **0b42788**, following service checkpoint52897cb. The full hunting game goal remains active. Godot4.5.2 standard/Compatibility and hunting schema1 remain; **hunting protocol2 requires matching0.1.3 builds for every player**. Earlier archives and fishing worlds are preserved.

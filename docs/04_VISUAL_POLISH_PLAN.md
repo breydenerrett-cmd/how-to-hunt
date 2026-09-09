@@ -1,3 +1,7 @@
+Implementation note0.1.5: the first lighting/material pass is implemented; see HANDOFF.md for actual rendered evidence and performance limits. The original diagnosis below overstates uniformity: earlier builds already had timber/ground grain, a rifle-stock shader and some distinct roughness. New families extend those techniques. Foliage and overall composition remain unfinished.
+
+Renderer verification: [Godot4.5 Environment](https://docs.godotengine.org/en/4.5/classes/class_environment.html) explicitly says glow levels, strength, blend mode, normalization and map have no effect in Compatibility. The general glow-level advice below therefore does not apply to this renderer. This build uses ACES, ambient sky contribution and adjustments; glow remains disabled. [BaseMaterial3D](https://docs.godotengine.org/en/4.5/classes/class_basematerial3d.html) provides local UV1 triplanar mapping used for the new material families.
+
 # Visual polish — why it reads as generated, and the fixes
 
 Written 2026-09-08 against `hunt/forest.gd` and `scripts/visuals.gd`. Registered as HUNT-17
@@ -74,16 +78,85 @@ contact shading and objects read as stickers placed on the terrain. Cheapest eff
 is an explicit darkened contact element at the base of trees, rocks, buildings and props — a
 small flattened dark translucent mesh, or vertex-darkening on the lowest geometry ring.
 
-## Open decision — renderer
+## Renderer — revised after verification against the Godot 4.5 docs
 
-Compatibility caps this work: no SSAO, no SSIL, no volumetric fog. Forward+ would unlock
-them, at the cost of a higher GPU requirement that may exclude older machines, including the
-Intel Mac case noted in VALIDATION. **Do not switch renderers as part of the above.** It is a
-separate decision needing the owner's call on minimum hardware, and it must be re-validated
-on both platforms.
+Earlier guidance in this file said not to touch the renderer. **That was too cautious.**
+
+Verified: Compatibility silently ignores SSAO, SSIL, SDFGI, screen-space reflections,
+volumetric fog, depth of field, TAA, FXAA, SMAA and debanding. SSAO specifically is **not**
+supported in 4.5 — the 4.6-dev docs mark it supported, so it is coming, but do not plan
+around it yet.
+
+The decisive fact is that **since Godot 4.4 the engine falls back to Compatibility at
+runtime** when Vulkan, D3D12 or Metal is unavailable
+(`rendering/rendering_device/fallback_to_opengl3`). Machines below the Forward+ floor still
+run the game; they just get the simpler image. Forward+ needs roughly a 2015-era integrated
+GPU or better, and macOS 10.15+.
+
+So Forward+ is worth doing, but it must be **its own change**, validated separately on both
+platforms and on the Intel Mac case, with the fallback path actually exercised rather than
+assumed. Do not bundle it with the material work below.
+
+**Everything in HUNT-17 and HUNT-18 works on Compatibility today.** Tonemapping, Adjustments
+including LUT colour correction, Glow (reduced feature set), depth/height fog and MSAA 3D
+are all supported. Do not wait on the renderer to start.
 
 ## Order
 
 HUNT-17 first — smallest diff, largest visible change, and it recalibrates judgement of
 everything after it. Then HUNT-18, which is the real fix. HUNT-19 and HUNT-20 are cheap
 finishers. Judge each from native captures; automated checks cannot evaluate a look.
+
+---
+
+## Verified implementation details
+
+Checked against the Godot 4.5 documentation. Use these rather than guessing.
+
+**Tonemapping.** ACES or AgX. `tonemap_white` 6.0-8.0 applies to filmic/ACES and is
+meaningless for Linear and AgX. AgX needs roughly twice the exposure of ACES, so re-check
+`tonemap_exposure` after switching.
+
+**Glow.** The docs recommend a *single* level set to 1.0 with the others at 0.0. Blend mode
+Additive reads arcade; Softlight is the default. Set `glow_hdr_threshold` near 1.0 so only
+genuinely bright surfaces bloom. Pair with `emission_enabled` and
+`emission_energy_multiplier > 1.0` on a few accent surfaces — this is how solid-colour
+geometry gets punch without textures.
+
+**Fog.** Use depth and height fog, not volumetric. `fog_sun_scatter` and
+`fog_aerial_perspective` tie geometry into the sky and give free depth separation. Both work
+on Compatibility and do more for stylised depth than volumetrics would.
+
+**Triplanar is the key unlock for HUNT-18.** The meshes here are built in code and have no
+UVs, so ordinary texturing cannot work. `StandardMaterial3D` has it built in:
+`uv1_triplanar = true`, plus `uv1_triplanar_sharpness`, `uv1_world_triplanar` and `uv1_scale`.
+That texturises UV-less procedural geometry with no UV work at all. Known bug: triplanar on
+UV2 breaks UV1 normal maps (godot#120312), so keep it on UV1.
+
+**Rim light.** `rim_enabled`, `rim` 1.0, `rim_tint` 0.5 separates silhouettes cheaply and
+suits a stylised look.
+
+**Two gotchas that will silently cost time.**
+- `SurfaceTool.set_color()` must be called before the **first** `add_vertex()`, or the vertex
+  format is locked without colour and every later call is ignored. Then set
+  `vertex_color_use_as_albedo = true`.
+- On `MultiMeshInstance3D`, set `use_colors = true` **before** any `set_instance_color()`,
+  same ordering trap.
+
+**Colour grading.** `adjustment_color_correction` accepts a Texture3D LUT at 17³ or 33³, or a
+GradientTexture1D for a cheaper ramp. A single LUT unifies the whole palette in one asset and
+is the best quality-per-effort item available here.
+
+**Anti-aliasing.** MSAA 3D at 4x is the documented recommendation for stylised games and does
+work on Compatibility. SMAA, FXAA and TAA require Forward+ or Mobile. TAA suits photoreal and
+adds blur and ghosting; it is the wrong choice for this look.
+
+**Camera.** Default `fov` is 75 vertical. 55-65 with the camera pulled back reads more
+cinematic and, usefully here, reduces the perspective distortion that makes primitive shapes
+look like primitives.
+
+**Animation feel (supports HUNT-16).** `Tween` with `TRANS_BACK` and `EASE_OUT` is the
+workhorse for overshoot-and-settle. Roughly 0.2s for a scale pop, 0.05-0.1s of anticipation
+counter-movement before an action. `parallel()` and `chain()` layer secondary motion in a few
+lines. For squash and stretch, a small damped spring driving scale per frame beats a one-shot
+tween, because it overshoots and settles on its own.

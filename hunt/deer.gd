@@ -3,6 +3,7 @@ extends CharacterBody3D
 const V=preload("res://scripts/visuals.gd")
 const Model=preload("res://hunt/animal_model.gd")
 const Forest=preload("res://hunt/forest.gd")
+const CARRY_BACK:=2.35
 var entity_id=1
 var authority=true
 var size_factor=1.0
@@ -30,6 +31,7 @@ var charge_hit=false
 var charge_direction=Vector3.FORWARD
 var danger:MeshInstance3D
 var head_hit:Area3D
+var torso_hit:Area3D
 var head_pitch=0.0
 var route=PackedVector3Array()
 var route_timer=0.0
@@ -53,7 +55,7 @@ func follow_route(game:Node,dt:float,flee:bool) -> Vector3:
 func _ready() -> void:
  collision_layer=8;collision_mask=1
  var collision=CollisionShape3D.new();add_child(collision);var support=CapsuleShape3D.new();support.radius=.3*size_factor;support.height=2.0*size_factor;collision.shape=support;collision.position=Vector3.UP*size_factor
- var torso_hit=Area3D.new();add_child(torso_hit);torso_hit.collision_layer=4;torso_hit.collision_mask=0
+ torso_hit=Area3D.new();add_child(torso_hit);torso_hit.collision_layer=4;torso_hit.collision_mask=0
  var hit=CollisionShape3D.new();torso_hit.add_child(hit);var shape=BoxShape3D.new();shape.size=Vector3(.62,.75,1.65)*size_factor;hit.shape=shape;hit.position=Vector3(0,1.16,0)*size_factor
  head_hit=Area3D.new();add_child(head_hit);head_hit.collision_layer=4;head_hit.collision_mask=0;head_hit.position=Vector3(0,1.39,-.57)*size_factor
  var head_shape=CollisionShape3D.new();head_hit.add_child(head_shape);var hs=BoxShape3D.new();hs.size=Vector3(.37,.38,.66)*size_factor;head_shape.shape=hs;head_shape.position=Vector3(0,.62,-.48)*size_factor
@@ -70,8 +72,15 @@ func step(game:Node,dt:float) -> void:
  head_pitch=lerp_angle(head_pitch,-.85 if state=="graze" and alert<.4 else (-.45 if state=="windup" else .05),1-exp(-4*dt));head_hit.rotation.x=head_pitch
  if hp<=0:
   state="down";velocity=Vector3.ZERO
+  # The hitboxes are placed for a standing animal, but the carcass lies on its side.
+  # Left live they float upright and silently eat a team mate's shot at a live deer.
+  if torso_hit.collision_layer!=0:torso_hit.collision_layer=0;head_hit.collision_layer=0
   if holder>=0 and game.avatars.has(holder):
-   var a=game.avatars[holder];position=a.position-a.forward()*1.8;position.y=Forest.height_at(position.x,position.z);rotation.y=a.input_yaw+PI
+   var a=game.avatars[holder];var anchor=a.position-a.forward()*CARRY_BACK
+   # Terrain behind the carrier is higher when dragging downhill, and sampling it raised
+   # the carcass to eye level and filled the screen. Never let it climb above the carrier.
+   anchor.y=minf(Forest.height_at(anchor.x,anchor.z),a.position.y+.15)
+   position=anchor;rotation.y=a.input_yaw+PI
   return
  var target:Node3D=null;var dist=1000.0;var visible=false
  var strongest=0.0
@@ -82,9 +91,11 @@ func step(game:Node,dt:float) -> void:
   var query=PhysicsRayQueryParameters3D.create(position+Vector3.UP*1.5,a.position+Vector3.UP*a.eye_height,1)
   var sight=get_world_3d().direct_space_state.intersect_ray(query).is_empty()
   # A low stance changes the sight ray; only physical cover blocks it.
-  var scent=d<9 and (a.position-position).normalized().dot(Vector3(.8,0,.6))<-.4
-  var strength=game.Stealth.detection(a,d,sight,scent)
-  if strength>strongest or (strength==strongest and d<dist):
+  var scent=d<game.Stealth.scent_radius(game.progress.upgrades) and (a.position-position).normalized().dot(Vector3(.8,0,.6))<-.4
+  var strength=game.Stealth.detection(a,d,sight,scent,game.progress.upgrades)
+  # Without the strength>0 guard the equal-scores tiebreak selects an entirely
+  # undetected hunter, so target no longer means "a threat this animal can perceive".
+  if strength>0 and (strength>strongest or (strength==strongest and d<dist)):
    strongest=strength;target=a;dist=d;visible=sight
  if strongest>0:
   alert=minf(1.0,alert+dt*strongest);threat_position=target.position

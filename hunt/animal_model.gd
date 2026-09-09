@@ -52,6 +52,11 @@ func _ready() -> void:
     S.loft(knee,"ClovenHoof",[S.section(Vector3(side*.027,-.475,-.01),.024,.03),S.section(Vector3(side*.027,-.51,-.045),.025,.045),S.section(Vector3(side*.027,-.52,-.14),.023,.025)],Color("30392f"),Color.TRANSPARENT,10)
  tail=Node3D.new();add_child(tail);tail.position=Vector3(0,1.44,.78)
  S.loft(tail,"WhiteFlagTail",[S.section(Vector3.ZERO,.07,.06),S.section(Vector3(0,.05,.14),.09,.065),S.section(Vector3(0,.09,.29),.055,.04),S.section(Vector3(0,.11,.36),.004,.005)],coat,cream)
+ # Explicit surface membership, before batching; no authoritative shape changes.
+ var surfaces:Array[MeshInstance3D]=[];S.collect(self,surfaces)
+ for mesh in surfaces:
+  if str(mesh.name) in ["ChestFlankHaunch","TaperedNeck","BrowCheekMuzzle","PointedEar","InnerEar","UpperLeg","TendonAndPastern","WhiteFlagTail"]:
+   preload("res://hunt/surface_families.gd").apply(mesh,"fur")
  # Merge only rigid surfaces; animated joints and blinking eyes remain independent.
  S.batch_details(neck,"HeadAndAntlers",eyes,false)
  for ear in ears:S.batch_details(ear,"EarSurface")

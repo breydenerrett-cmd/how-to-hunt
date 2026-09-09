@@ -45,6 +45,7 @@ var last_inputs:Dictionary={}
 var last_commands:Dictionary={}
 var snapshot_timer=0.0
 var save_timer=0.0
+var save_pending=false
 var join_started=-1.0
 var test_mode=false
 var bot_mode=""
@@ -161,7 +162,7 @@ func _physics_process(dt:float) -> void:
  for a in avatars.values():
   if clock-a.last_input>.6:a.input_move=Vector2.ZERO;a.input_sprint=false;a.input_reel=false;a.input_crouch=false
   a.server_step(dt,a.held>=0,.25 if "pack" in progress.upgrades else 0.0,false)
-  a.surface_name=Stealth.surface_at(a.position);a.noise=Stealth.movement_noise(a)
+  a.surface_name=Stealth.surface_at(a.position);a.noise=Stealth.movement_noise(a,progress.upgrades)
   var gain=1.54 if "scope" in progress.upgrades else 1.0
   a.fishing.steady=clampf(float(a.fishing.get("steady",0))+dt*gain if a.input_reel and a.visual_speed<2.4 else 0,0,1)
   if a.reload_until>0 and clock>=a.reload_until:a.magazines.rifle=mini(4,int(progress.ammo));a.reload_until=0
@@ -176,7 +177,7 @@ func _physics_process(dt:float) -> void:
    var packet=state_packet();var chunks=Wire.encode(packet)
    for i in range(chunks.size()):receive_state.rpc(int(packet.revision),i,chunks.size(),chunks[i])
  save_timer+=dt
- if save_timer>=30:save_timer=0;save_progress()
+ if save_timer>=30 or (save_pending and save_timer>=3):save_timer=0;save_pending=false;save_progress()
 func _process(dt:float) -> void:
  clock+=dt;recoil=maxf(0,recoil-dt*5)
  if join_started>=0 and clock-join_started>12:end_session("Connection timed out. Confirm both computers have this hunting build and the host is running.")
@@ -193,13 +194,14 @@ func _process(dt:float) -> void:
    gun.visible="rifle" in progress.upgrades and a.held<0 and a.health>0
    gun.position=gun.position.lerp(Vector3(.04,-.28,-.92) if a.input_reel else Vector3(.3,-.32,-.80),1-exp(-10*dt))
    gun.rotation=Vector3(recoil*.19+(-.45 if a.reload_until>clock else 0),0,sin(clock*2)*.008*motion)
-   gun.presentation(a.reload_until>clock,clock,"scope" in progress.upgrades,motion)
+   gun.presentation(a.reload_until>clock,clock,"scope" in progress.upgrades,motion,"muffler" in progress.upgrades)
    footstep+=dt
    if a.visual_speed>.4 and footstep>(.70 if a.crouched else (.30 if a.input_sprint else .48)):sound.tone("step",maxf(.12,a.noise));footstep=0
  ui.update(dt)
  if not capture_path.is_empty():
   capture_elapsed+=dt
   if capture_elapsed>4 and DisplayServer.get_name()!="headless":
+   RenderingServer.force_draw() # Also supports minimized, disposable capture sessions.
    get_viewport().get_texture().get_image().save_png(capture_path);print("HUNT_CAPTURE ",capture_path);capture_path=""
    if "--capture-quit" in OS.get_cmdline_user_args():shutdown()
 func submit_input(move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool,crouch:bool=false) -> void:
@@ -227,7 +229,7 @@ func apply_state(packet:Dictionary) -> void:
  if int(packet.revision)<=last_revision:return
  last_revision=int(packet.revision);progress=packet.progress;var ids=[]
  for d in packet.players:
-  var id=int(d.id);ids.append(id);var a=add_avatar(id,d.name);a.target_position=d.p;a.target_yaw=d.yaw;a.health=d.hp;a.held=int(d.held);a.visual_speed=d.speed;a.fishing=d.fish;a.magazines=d.magazines;a.crouched=bool(d.crouched);a.noise=float(d.noise);a.surface_name=str(d.surface);a.eye_height=float(d.eye_height)
+  var id=int(d.id);ids.append(id);var a=add_avatar(id,d.name);a.target_position=d.p;a.target_yaw=d.yaw;a.health=d.hp;a.held=int(d.held);a.visual_speed=d.speed;a.fishing=d.fish;a.magazines=d.magazines;a.crouched=bool(d.crouched);a.noise=float(d.noise);a.surface_name=str(d.surface);a.eye_height=float(d.eye_height);a.input_yaw=float(d.get("input_yaw",d.yaw))
   # Reload remaining time is derived from a duration in future revisions; current packet uses a host-relative hint only.
   a.reload_until=clock+.1 if float(d.reload_until)>0 else 0
   if id==local_id:a.input_reel=Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and not ui.panel.visible;a.body_root.hide();a.name_label.hide()
@@ -260,7 +262,11 @@ func accept_action(id:int,seq:int,action:String,data:Dictionary) -> void:
   "interact":interact(a)
   "pickup":pickup(a)
   "drop":drop(a)
- if action in ["buy","fire","interact","pickup","drop"]:save_progress()
+ # Transactions save immediately: credits and equipment must never be lost. Firing and
+ # carrying only move ammunition and holder state, and were costing a full duplicate,
+ # JSON encode and synchronous disk write on every single shot.
+ if action in ["buy","interact"]:save_progress()
+ elif action in ["fire","pickup","drop"]:save_pending=true
 func buy(a:Node3D,id:String) -> void:
  if not active or not is_host or avatars.get(a.peer_id)!=a or a.health<=0:return
  var result=Economy.purchase(progress,id,a.position.distance_to(C.SHOP)<=8)
@@ -274,10 +280,9 @@ func fire(a:Node3D) -> void:
  var origin=a.position+Vector3.UP*a.eye_height;var direction=Basis.from_euler(Vector3(a.input_pitch,a.input_yaw,0))*Vector3.FORWARD
  var query=PhysicsRayQueryParameters3D.create(origin,origin+direction*85,5);query.collide_with_areas=true;var result=get_world_3d().direct_space_state.intersect_ray(query)
  var end=origin+direction*85 if result.is_empty() else result.position
- shot_fx(origin,end)
- if online:shot_fx.rpc(origin,end)
- for animal in animals.values():
-  if animal.hp>0 and animal.position.distance_to(a.position)<30:animal.alert=1;animal.threat_position=a.position
+ shot_fx(origin,end,a.peer_id)
+ if online:shot_fx.rpc(origin,end,a.peer_id)
+ Stealth.shot_disturbance(self,origin,end,not result.is_empty())
  if result.is_empty() or not result.collider is Area3D:return
  var animal=result.collider.get_parent()
  if not animal.get_script()==Deer:return
@@ -288,11 +293,19 @@ func fire(a:Node3D) -> void:
  elif animal.elite:note(a.peer_id,"EXPOSED HIT • %d damage"%int(applied) if animal.state=="recover" else "BRACED HIDE • reduced damage. Dodge the rush, then fire while it recovers.","hit")
  else:note(a.peer_id,"Hit! Follow its hoofprints; steady aim hits harder.","hit")
 @rpc("authority","call_remote","unreliable",3)
-func shot_fx(start:Vector3,end:Vector3) -> void:
- sound.tone("shot");recoil=1
+func shot_fx(start:Vector3,end:Vector3,shooter:int) -> void:
+ # Recoil is a first-person camera kick. Applying it on every peer meant a four-player
+ # hunt jolted everyone's view each time anyone pulled a trigger.
+ if shooter==local_id:recoil=1
+ # Roll the report off with distance from the listener, so a shot across the valley reads
+ # as a distant cue instead of arriving at the same volume as your own rifle.
+ var falloff=clampf(8.0/maxf(8.0,camera.global_position.distance_to(start)),.06,1.0)
+ sound.tone("shot",(.28 if "muffler" in progress.upgrades else 1.0)*falloff)
  var mesh=ImmediateMesh.new();mesh.surface_begin(Mesh.PRIMITIVE_LINES);mesh.surface_add_vertex(start);mesh.surface_add_vertex(end);mesh.surface_end()
  var n=MeshInstance3D.new();add_child(n);n.mesh=mesh;n.material_override=V.material(Color("eacf9b"),.6)
  var tween=create_tween();tween.tween_interval(.075);tween.tween_callback(n.queue_free)
+ if start.distance_to(end)<84.9:
+  var spark=V.sphere(self,end,.055,Color("e8bf77"));var fade=create_tween();fade.tween_property(spark,"scale",Vector3.ONE*.1,.18);fade.tween_callback(spark.queue_free)
 func nearest_animal(a:Node3D,dead:bool=true) -> Node3D:
  var selected:Node3D=null;var distance=3.4
  for animal in animals.values():

@@ -49,25 +49,35 @@ static func branch(parent:Node3D,label:String,points:Array,radii:Array,color:Col
  for i in range(points.size()):sections.append(section(points[i],radii[i],radii[i]))
  return loft(parent,label,sections,color,Color.TRANSPARENT,10)
 static func batch_details(parent:Node3D,label:String,exclude:Array=[],recursive:bool=true) -> void:
- # Decorative static details share a colored mesh; interaction/collision stays separate.
- var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES)
+ # Batch each declared surface family separately so cloth/fur never becomes metal.
  var meshes:Array[MeshInstance3D]=[]
  if recursive:collect(parent,meshes)
  else:
   for child in parent.get_children():
-   if child is MeshInstance3D and child not in exclude:meshes.append(child)
+   if child is MeshInstance3D:meshes.append(child)
+ var groups:Dictionary={}
  for node in meshes:
-  var transform=parent.global_transform.affine_inverse()*node.global_transform
-  var normal_basis=transform.basis.inverse().transposed()
-  var color=Color.WHITE
-  if node.material_override is StandardMaterial3D:color=node.material_override.albedo_color
-  for surface in range(node.mesh.get_surface_count()):
-   var arrays=node.mesh.surface_get_arrays(surface);var vertices=arrays[Mesh.ARRAY_VERTEX];var normals=arrays[Mesh.ARRAY_NORMAL];var indices=arrays[Mesh.ARRAY_INDEX];var paint=arrays[Mesh.ARRAY_COLOR]
-   if indices==null or indices.is_empty():indices=range(vertices.size())
-   for index in indices:
-    st.set_color(color*paint[index] if paint!=null and not paint.is_empty() else color);st.set_normal((normal_basis*normals[index]).normalized());st.add_vertex(transform*vertices[index])
-  node.queue_free()
- st.index();var result=V.mesh(parent,st.commit(),Vector3.ZERO,Color.WHITE);result.name=label;result.material_override.vertex_color_use_as_albedo=true
+  if node in exclude or node.is_queued_for_deletion():continue
+  var family=str(node.get_meta("surface_family","plain"))
+  if not groups.has(family):groups[family]=[]
+  groups[family].append(node)
+ for family in groups:
+  var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES)
+  for node in groups[family]:
+   var transform=parent.global_transform.affine_inverse()*node.global_transform
+   var normal_basis=transform.basis.inverse().transposed()
+   var color=Color.WHITE
+   if node.material_override is StandardMaterial3D:color=node.material_override.albedo_color
+   for surface in range(node.mesh.get_surface_count()):
+    var arrays=node.mesh.surface_get_arrays(surface);var vertices=arrays[Mesh.ARRAY_VERTEX];var normals=arrays[Mesh.ARRAY_NORMAL];var indices=arrays[Mesh.ARRAY_INDEX];var paint=arrays[Mesh.ARRAY_COLOR]
+    if indices==null or indices.is_empty():indices=range(vertices.size())
+    for index in indices:
+     st.set_color(color*paint[index] if paint!=null and not paint.is_empty() else color);st.set_normal((normal_basis*normals[index]).normalized());st.add_vertex(transform*vertices[index])
+   node.queue_free()
+  st.index();var result=V.mesh(parent,st.commit(),Vector3.ZERO,Color.WHITE)
+  result.name=label if family=="plain" else label+"_"+family
+  result.material_override.vertex_color_use_as_albedo=true
+  if family!="plain":preload("res://hunt/surface_families.gd").apply(result,family)
 static func collect(root:Node,meshes:Array[MeshInstance3D]) -> void:
  for child in root.get_children():
   if child is MeshInstance3D:meshes.append(child)

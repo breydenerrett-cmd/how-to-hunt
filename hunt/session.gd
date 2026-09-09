@@ -5,6 +5,10 @@ const C=preload("res://hunt/catalog.gd")
 const Wire=preload("res://scripts/snapshot_wire.gd")
 static func start_host(game:Node,networked:bool,player_name:String,slot:int) -> void:
  if game.active:return
+ # Cancel any join still in flight. start_join only clears join_started on bootstrap, so a
+ # player who clicks JOIN and then HOST leaves it set, and the 12s join timeout in
+ # _process later tears down this healthy hosted session as "Connection timed out".
+ game.join_started=-1
  game.store.slot=slot;var loaded=game.store.load_world()
  if loaded.is_empty():game.ui.main_menu(game.store.last_error);return
  if networked:

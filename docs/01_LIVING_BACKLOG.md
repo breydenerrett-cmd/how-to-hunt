@@ -16,14 +16,20 @@ Owner changed the goal on 2026-09-08 to a distinct arcade hunting game reusing t
 | HUNT-10 | End-of-day playable milestone; end-of-week quality aspiration | First versioned hunting prototype being delivered. | Human quality, native platform and clean-install gates; update estimates from evidence. Steam release/publication, marketing and paid services remain unapproved. |
 | HUNT-11 | Deliberate stalking via a crouch stance | Implemented0.1.3: Ctrl/C stance, headroom, lower camera/rays and replication. | Protocol2; physical/guest tests pass. Human cover/feel playtest remains. |
 | HUNT-12 | Flee rate scales continuously with how quietly you move | Implemented0.1.3: actual speed/stance/surface noise and HUD meter. | Tune suspicion and readability from human stalking play. |
-| HUNT-13 | Gear that makes you quieter and harder to smell | No stealth items in ITEMS. | Add boots, overshirt, scent cover. Adding item ids is save-safe; never remove one. |
-| HUNT-14 | Shots spook nearby animals unless suppressed | Fixed 30 m hard snap to alert=1. | Add silencer item, gear-dependent radius and distance falloff. |
+| HUNT-13 | Gear that makes you quieter and harder to smell | Implemented0.1.4: boots, wool and scent cover. | Permanent shared purchases; tune costs/effects from human play. Never remove saved item IDs. |
+| HUNT-14 | Shots spook nearby animals unless suppressed | Implemented0.1.4: muffled barrel, distance falloff and actual impact cues. | Shot/impact ray tests pass; human acoustics and balance remain open. |
 | HUNT-15 | Wind is a live variable, not a memorised constant | Hardcoded direction; HUD string says south-east. | Host-owned rotating wind, replicated, shown in world and HUD. |
 | HUNT-16 | Supporting realism that rewards patience | Partly present via head tells and tracks. | Freeze-to-calm, herd awareness, wounded trails, stamina, light-dependent sight. |
 | HUNT-17 | Image reads as graded and lit, not raw | Linear tonemap, no glow, no grade, sky contributes no ambient. | Environment pass. See docs/04_VISUAL_POLISH_PLAN.md. Compare 1080p before/after. |
 | HUNT-18 | Surfaces read as different materials | Every object shares a flat colour and roughness 0.82. | Surface families with shared procedural noise normal/roughness maps. |
 | HUNT-19 | Repeated props stop reading as clones | Uniform scale, rotation and colour on placed props. | Deterministic per-instance hue/scale/yaw jitter, seeded so host and guests agree. |
 | HUNT-20 | Objects sit in the world instead of on it | Compatibility has no SSAO; no contact shading anywhere. | Explicit darkened contact geometry at object bases. |
+| HUNT-21 | Hauling a carcass never blocks the view | BUG: carcass occludes camera, fills screen in owner captures. | Fix first. See docs/05_HAULING_AND_PROGRESSION_PLAN.md. Prove with a 1080p haul sequence. |
+| HUNT-22 | Player chooses a fast light haul or a slow valuable one | Only whole-carcass dragging exists. | Field dressing for pelts: lower value, keeps the rifle. |
+| HUNT-23 | Carrying is the tense part of the loop | Carrying is a safe walk with no downside. | Rifle stowed while hauling; a predator that contests the kill rather than killing the player. |
+| HUNT-24 | Hauling looks like effort | No grip or hand contact; carcass is just positioned behind. | Two-handed grip, weight-scaled lean and stride, drag audio. |
+| HUNT-25 | Transport is a visible upgrade ladder | Hand dragging only. | Travois, handcart, pack animal, wagon. Introduce only after hauling pain is real. |
+| HUNT-26 | World labels never overlap the HUD | BUG: CROWNBACK RIDGE overlaps the top-right panel. | Reserve HUD margins; scale and fade distant labels. Verify at 720p and 1080p. |
 
 Latest0.1.1: HUNT-02 static routes/scent/alert/committed rush and counterattack are implemented;113 selected checks. HUNT-04 bounded trail bootstrap/rejoin is implemented. Human balance and dynamic navigation remain open.
 
@@ -33,6 +39,8 @@ Latest development checkpoint: HUNT-08 first service extraction, with89 selected
 
 Latest0.1.3 implements HUNT-11/12 crouch and noise with148 selected assertions, plus mixed-version rejection.
 
-Next bounded session: HUNT-13/14 quiet gear and shot falloff/impact cues, then HUNT-15/16 changing wind and herd awareness. HUNT-06 opening story remains planned. Preserve actual footsteps, collision, hitbox and reward tests. Keep the original arcade tone; avoid heavy survival chores until hunting is enjoyable.
+Latest0.1.4 implements HUNT-13/14 with140 selected assertions and earned multiplayer gear purchases.
+
+Latest0.1.5 implements the first HUNT-17/18 lighting/material pass; original geometry and foliage still need refinement. Next bounded session: fix HUNT-21 hauling-camera obstruction and HUNT-26 landmark/HUD overlap, with actual captures and authoritative retrieval/sale regressions. HUNT-15/16 changing wind/herd awareness and HUNT-06 opening story remain planned. Preserve actual footsteps, collision, hitbox and reward tests. Keep the original arcade tone; avoid heavy survival chores until hunting is enjoyable.
 
 Hourly continuation uses the existing task automation. Keep meaningful milestone/failure/input notifications only, and avoid overlapping implementation or owner gameplay. The broader hunting goal remains active.

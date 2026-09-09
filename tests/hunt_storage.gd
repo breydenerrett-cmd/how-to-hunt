@@ -20,5 +20,17 @@ func _initialize() -> void:
  var recovered=s.load_world();check(s.recovered and recovered==JSON.parse_string(JSON.stringify(old)),"corrupt primary recovers distinct previous equipment snapshot")
  check(s.save_world(recovered) and s.load_world()==JSON.parse_string(JSON.stringify(old)),"recovered state repairs primary")
  var bad=old.duplicate(true);bad.ammo=-1;check(not s.save_world(bad) and s.load_world()==JSON.parse_string(JSON.stringify(old)),"invalid save cannot overwrite valid world")
+ # A corrupt primary must never be carried into the recovery copies. _write_snapshot
+ # previously copied the primary into .bak unconditionally, so within two saves of any
+ # corruption every recovery generation held the same damage.
+ var good=old.duplicate(true);good.wallet=88
+ check(s.save_world(good),"known good state stored before corruption")
+ var handle=FileAccess.open(s.path(),FileAccess.WRITE);handle.store_string("{not json");handle.close()
+ var next=good.duplicate(true);next.wallet=93
+ check(s.save_world(next),"a save still succeeds when the primary on disk is corrupt")
+ var backup=FileAccess.open(s.path()+".bak",FileAccess.READ)
+ var backup_text=backup.get_as_text();backup.close()
+ check(JSON.parse_string(backup_text)!=null,"corrupt primary is not copied over the recovery copy")
+ check(s.load_world().wallet==93,"repaired primary loads the newest state")
  for suffix in ["",".bak",".bak2",".tmp"]:DirAccess.remove_absolute(ProjectSettings.globalize_path(s.path()+suffix))
  print("TEST_SUMMARY hunt_storage passes=",passes," failures=",failures);quit(1 if failures else 0)

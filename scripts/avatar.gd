@@ -212,4 +212,4 @@ func holding_position() -> Vector3:
 	return position+Vector3(0,1.25,0)+forward()*1.3
 
 func packet() -> Dictionary:
-	return {"crouched":crouched,"noise":noise,"surface":surface_name,"eye_height":eye_height,"id":peer_id,"name":display_name,"p":position,"yaw":rotation.y,"hp":health,"held":held,"tool":tool,"water":water_time,"speed":visual_speed,"fish":fishing.duplicate(true),"magazines":magazines.duplicate(),"ammo_kind":ammo_kind,"reload_until":reload_until}
+	return {"crouched":crouched,"noise":noise,"surface":surface_name,"eye_height":eye_height,"id":peer_id,"name":display_name,"p":position,"yaw":rotation.y,"input_yaw":input_yaw,"hp":health,"held":held,"tool":tool,"water":water_time,"speed":visual_speed,"fish":fishing.duplicate(true),"magazines":magazines.duplicate(),"ammo_kind":ammo_kind,"reload_until":reload_until}
