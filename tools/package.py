@@ -146,7 +146,7 @@ def main() -> None:
         if archive.testzip():
             raise RuntimeError("Final Mac archive CRC failed")
     outputs.append({"path": str(mac_output), "bytes": mac_output.stat().st_size, "sha256": hashlib.sha256(mac_output.read_bytes()).hexdigest(), "zip_crc": "passed"})
-    excluded = {".godot", ".git", ".tools", "exports", "__pycache__", ".DS_Store"}
+    excluded = {".godot", ".git", ".tools", "exports", "evidence", "__pycache__", ".DS_Store"}
     source = []
     for path in sorted(ROOT.rglob("*")):
         relative = path.relative_to(ROOT)

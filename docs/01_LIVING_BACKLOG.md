@@ -14,12 +14,16 @@ Owner changed the goal on 2026-09-08 to a distinct arcade hunting game reusing t
 | HUNT-08 | Architecture reusable without two drifting monoliths | Selected foundation copies; first session/economy extraction implemented in0.1.3-dev. | Session lifecycle and scene-independent economy are separate; RPC/actor orchestration remains in game.gd. Version shared modules once real common behavior is proven. Do not claim a finished-game reuse percentage. |
 | HUNT-09 | More wildlife and survival/crafting | Deferred beyond first loop. | Deer first, then elk/birds with actual new behavior/rigs. Resource gathering, recipes, daily tree regrowth and thirst need separate authoritative systems and recovery rules. |
 | HUNT-10 | End-of-day playable milestone; end-of-week quality aspiration | First versioned hunting prototype being delivered. | Human quality, native platform and clean-install gates; update estimates from evidence. Steam release/publication, marketing and paid services remain unapproved. |
-| HUNT-11 | Deliberate stalking via a crouch stance | Absent; avatar has only sprint/walk. | Owner-requested. See docs/02_STEALTH_AND_REALISM_PLAN.md. Needs PROTOCOL bump. |
-| HUNT-12 | Flee rate scales continuously with how quietly you move | Binary alert gain 0.9 sprint / 0.45 otherwise. | Replace with 0..1 noise value plus a HUD stealth meter so it is learnable. |
+| HUNT-11 | Deliberate stalking via a crouch stance | Implemented0.1.3: Ctrl/C stance, headroom, lower camera/rays and replication. | Protocol2; physical/guest tests pass. Human cover/feel playtest remains. |
+| HUNT-12 | Flee rate scales continuously with how quietly you move | Implemented0.1.3: actual speed/stance/surface noise and HUD meter. | Tune suspicion and readability from human stalking play. |
 | HUNT-13 | Gear that makes you quieter and harder to smell | No stealth items in ITEMS. | Add boots, overshirt, scent cover. Adding item ids is save-safe; never remove one. |
 | HUNT-14 | Shots spook nearby animals unless suppressed | Fixed 30 m hard snap to alert=1. | Add silencer item, gear-dependent radius and distance falloff. |
 | HUNT-15 | Wind is a live variable, not a memorised constant | Hardcoded direction; HUD string says south-east. | Host-owned rotating wind, replicated, shown in world and HUD. |
 | HUNT-16 | Supporting realism that rewards patience | Partly present via head tells and tracks. | Freeze-to-calm, herd awareness, wounded trails, stamina, light-dependent sight. |
+| HUNT-17 | Image reads as graded and lit, not raw | Linear tonemap, no glow, no grade, sky contributes no ambient. | Environment pass. See docs/04_VISUAL_POLISH_PLAN.md. Compare 1080p before/after. |
+| HUNT-18 | Surfaces read as different materials | Every object shares a flat colour and roughness 0.82. | Surface families with shared procedural noise normal/roughness maps. |
+| HUNT-19 | Repeated props stop reading as clones | Uniform scale, rotation and colour on placed props. | Deterministic per-instance hue/scale/yaw jitter, seeded so host and guests agree. |
+| HUNT-20 | Objects sit in the world instead of on it | Compatibility has no SSAO; no contact shading anywhere. | Explicit darkened contact geometry at object bases. |
 
 Latest0.1.1: HUNT-02 static routes/scent/alert/committed rush and counterattack are implemented;113 selected checks. HUNT-04 bounded trail bootstrap/rejoin is implemented. Human balance and dynamic navigation remain open.
 
@@ -27,6 +31,8 @@ Latest0.1.2: HUNT-03 adds rounded original creatures and articulated poses, deta
 
 Latest development checkpoint: HUNT-08 first service extraction, with89 selected assertions and no new packaged release.
 
-Next bounded session: HUNT-11/12 owner-requested crouch and visible noise meter, with host authority, physical headroom and a protocol bump. Follow HUNT-13/14 quiet gear and shot falloff; HUNT-06 opening story remains planned. Preserve actual footsteps, collision, hitbox and reward tests. Keep the original arcade tone; avoid heavy survival chores until hunting is enjoyable.
+Latest0.1.3 implements HUNT-11/12 crouch and noise with148 selected assertions, plus mixed-version rejection.
+
+Next bounded session: HUNT-13/14 quiet gear and shot falloff/impact cues, then HUNT-15/16 changing wind and herd awareness. HUNT-06 opening story remains planned. Preserve actual footsteps, collision, hitbox and reward tests. Keep the original arcade tone; avoid heavy survival chores until hunting is enjoyable.
 
 Hourly continuation uses the existing task automation. Keep meaningful milestone/failure/input notifications only, and avoid overlapping implementation or owner gameplay. The broader hunting goal remains active.

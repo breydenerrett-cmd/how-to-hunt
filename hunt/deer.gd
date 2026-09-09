@@ -79,15 +79,11 @@ func step(game:Node,dt:float) -> void:
   if a.health<=0:continue
   var d=position.distance_to(a.position)
   if d>35:continue
-  var query=PhysicsRayQueryParameters3D.create(position+Vector3.UP*1.5,a.position+Vector3.UP*1.3,1)
+  var query=PhysicsRayQueryParameters3D.create(position+Vector3.UP*1.5,a.position+Vector3.UP*a.eye_height,1)
   var sight=get_world_3d().direct_space_state.intersect_ray(query).is_empty()
-  var radius=18.0 if a.input_sprint else (6.5 if a.input_reel else 11.0)
-  var moving=a.input_move.length()>.1
-  # Wind carries the hunter's scent toward the deer when the hunter is upwind.
+  # A low stance changes the sight ray; only physical cover blocks it.
   var scent=d<9 and (a.position-position).normalized().dot(Vector3(.8,0,.6))<-.4
-  var hearing=moving and d<(9.0 if a.input_sprint else 3.0)
-  var detected=(sight and d<radius) or scent or hearing
-  var strength=(.9 if a.input_sprint else .45) if detected else 0.0
+  var strength=game.Stealth.detection(a,d,sight,scent)
   if strength>strongest or (strength==strongest and d<dist):
    strongest=strength;target=a;dist=d;visible=sight
  if strongest>0:

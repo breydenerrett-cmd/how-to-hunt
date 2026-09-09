@@ -15,7 +15,7 @@ func run() -> void:
  var a=game.avatars[1];var deer=game.animals.values()[0]
  a.position=deer.position+Vector3(0,0,5);a.previous_position=a.position
  for i in range(100):
-  game.submit_input(Vector2.ZERO,0,0,false,true,false);await physics_frame
+  game.submit_input(Vector2(0,-1),0,0,false,true,false);await physics_frame
  check(deer.alert>.72 and deer.state=="flee","close loud hunter triggers real flee state")
  var before=deer.position
  await create_timer(.6).timeout

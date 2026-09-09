@@ -40,7 +40,7 @@ func run() -> void:
  hunter.position=deer.position+Vector3(-.8,0,-.6)*8;hunter.previous_position=hunter.position;hunter.input_reel=true
  deer.alert=0;deer.timer=1000
  var alert_seen=false
- for i in range(100):
+ for i in range(140):
   game.submit_input(Vector2.ZERO,0,0,false,false,true);await physics_frame
   if deer.state=="alert":alert_seen=true
  check(alert_seen,"upwind quiet hunter prompts visible alert before flight")

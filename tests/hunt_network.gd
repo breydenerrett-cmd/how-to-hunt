@@ -50,6 +50,11 @@ func guest_flow() -> void:
  for track in game.forest.tracks:
   if track.id==888 and track.p==Vector3(40,2,40) and absf(track.heading-.7)<.001:shared=true
  check(shared,"late guest receives existing host trail identity position and heading")
+ var self_avatar=game.avatars[game.local_id]
+ for i in range(45):game.submit_input(Vector2(.5,0),0,0,false,false,false,true);await physics_frame
+ check(self_avatar.crouched and self_avatar.eye_height<1.1 and self_avatar.noise>0 and self_avatar.noise<.3,"guest receives host simulated crouch eye height and quiet movement")
+ for i in range(20):game.submit_input(Vector2.ZERO,0,0,false,false,false,false);await physics_frame
+ check(not self_avatar.crouched and self_avatar.noise<.02,"guest receives standing stance and silent stop")
  if role!="guest0":
   var a=game.avatars[game.local_id];var before=a.position
   for i in range(40):game.submit_input(Vector2(1,0),0,0,false,false,false);await physics_frame

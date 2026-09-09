@@ -1,6 +1,6 @@
 # How to Hunt — Pinefall prototype
 
-Latest packaged playtest: **v0.1.2**. Current source: **0.1.3-dev**, session/economy extraction for the upcoming stalking milestone. Development source and packaged players have distinct version checks; use matching builds.
+Stalking build **v0.1.3**: hold **Ctrl or C** to crouch. All multiplayer players need this version (hunting protocol2).
 
 An original arcade woodland hunt for one to four players. This first playable slice reuses selected support systems from Catch Catastrophe, with new terrain, animal behavior, hunting progression and an independent save identity. It is an early prototype, not a finished commercial game or a verified reference match.
 
@@ -14,15 +14,15 @@ the newest release, so it is safe to bookmark and share.
 
 ## Play
 
-- Mac: unzip **How_To_Hunt_Mac_v0_1_2.zip**, then open **How to Hunt.app**. Apple Silicon and Intel are included; native launch was tested on Apple Silicon only. The app is ad-hoc signed, not notarized. If macOS blocks it, report the exact message; this build does not change security settings.
-- Windows: unzip **How_To_Hunt_Windows_v0_1_2.zip**, then open **HowToHunt/HowToHunt.exe**. Native Windows playtesting of this hunting build remains pending.
+- Mac: unzip **How_To_Hunt_Mac_v0_1_3.zip**, then open **How to Hunt.app**. Apple Silicon and Intel are included; native launch was tested on Apple Silicon only. The app is ad-hoc signed, not notarized. If macOS blocks it, report the exact message; this build does not change security settings.
+- Windows: unzip **How_To_Hunt_Windows_v0_1_3.zip**, then open **HowToHunt/HowToHunt.exe**. Native Windows playtesting of this hunting build remains pending.
 - Choose **PLAY SOLO**, or **HOST A HUNT**. Three hunting world slots are independent of fishing worlds. Normal launches save; preview/test/capture sessions disable saves.
 
 ## First hunt
 
 You start with 40 credits and empty hands. Walk to the timber **Pine & Powder** lodge on the left. Look at the rifle display and press **E** to inspect/buy the 25-credit trail rifle; it includes 12 shared rounds. The lodge also offers ammunition, a steadier sight, dragging harness and faster rifle action.
 
-Follow the gold hoofprints out of camp. **E** inspects nearby tracks and gives a temporary direction/distance to the animal. Moving fast and approaching upwind raises suspicion. Hold **right mouse** to move quietly and steady your aim; the center dot turns gold when ready. **Left mouse** fires. A clean single-shot harvest earns 25% more than its ordinary base value. Unsteady shots do less damage; follow the hoofprints if the animal flees.
+Follow the gold hoofprints out of camp. **E** inspects nearby tracks and gives a temporary direction/distance to the animal. Hold **Ctrl or C** to crouch and stalk. The **NOISE** meter shows how movement and trail/leaf litter affect your sound; stopping silences movement. Quiet is not invisible: nearby sight and upwind scent can still reveal you. You stay crouched beneath low ceilings until there is room to stand. Moving fast and approaching upwind raises suspicion. Hold **right mouse** to move quietly and steady your aim; the center dot turns gold when ready. **Left mouse** fires. A clean single-shot harvest earns 25% more than its ordinary base value. Unsteady shots do less damage; follow the hoofprints if the animal flees.
 
 Walk within reach of a downed deer and press **F** to drag it. Return to **The Game Exchange** on the right of camp and press **E** to sell. **Q** puts a harvest down so it can be retrieved again. After two sales, a contract sends you beyond the watchtower for the larger Crownback. Leave its orange charge lane when it braces: the rush commits to that direction. Its hide reduces damage until the three-second recovery window. Dodge, steady your aim and counterattack; bank its harvest to complete the current contract.
 

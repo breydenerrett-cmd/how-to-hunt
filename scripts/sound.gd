@@ -39,14 +39,14 @@ func _ready() -> void:
 	add_child(ambience)
 	ambience.play()
 
-func tone(kind:String) -> void:
+func tone(kind:String,gain:float=1.0) -> void:
 	if DisplayServer.get_name()=="headless": return
 	# Bound overlapping voices during four-player event bursts.
 	if get_child_count()>12: return
 	var player=AudioStreamPlayer.new()
 	if not cache.has(kind): cache[kind]=make_tone(kind)
 	player.stream=cache[kind]
-	player.volume_db=linear_to_db(maxf(volume,0.0001))-(12.0 if kind=="step" else 0.0)
+	player.volume_db=linear_to_db(maxf(volume,0.0001))+linear_to_db(clampf(gain,.01,1.0))-(12.0 if kind=="step" else 0.0)
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()

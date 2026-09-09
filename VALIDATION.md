@@ -1,3 +1,29 @@
+# Current stalking build — 0.1.3-hunt, 2026-09-08
+
+Branch `codex/hunting-stalking`, production **0b42788**, following service checkpoint52897cb. The full hunting game goal remains active. Godot4.5.2 standard/Compatibility and hunting schema1 remain; **hunting protocol2 requires matching0.1.3 builds for every player**. Earlier archives and fishing worlds are preserved.
+
+**Implemented HUNT-11/12:** hold Ctrl or C to crouch. Host movement has1.8m/s crouch,4.5 walk,6.5 run, with crouch overriding sprint. The capsule changes1.7→1.25m; standing uses a full-shape headroom query and remains crouched under a ceiling. Crouched jumping is disabled. Host eye height smoothly changes1.58→1.05m and is also the shot origin; snapshots carry stance, eye height, noise and surface. Third-person legs bend with knees and shortened/bunched coat presentation. This remains a stylized pose, not a finished human rig.
+
+Movement noise depends continuously on actual speed and stance, with quieter trail/camp surfaces and louder leaf litter. Stopping yields zero movement noise; quieter, slower local footstep playback reflects it. Hearing radius and suspicion gain use this host-computed value. Crouch reduces sight radius and lowers the sight ray, but close sight and upwind scent still detect stationary hunters. Existing physical cover can block rays; decorative foliage/rocks have no new concealment or collision system. The HUD labels stance, NOISE percentage/bar and surface, including larger text. Quiet is not invisibility or a universal detection meter.
+
+**148 selected assertions pass**, plus a separate actual prior0.1.2-client/new-host mismatch test and five package metadata units. Local ignored evidence: `evidence/release_v0_1_3/checks.json`, with source windows. Stalking15 covers actual movement under a low ceiling, blocked standing/jump, recovery outside cover, three speeds/noise levels, surface/stop behavior, sight/scent, real crouched ray hit and stale-input rejection. Joint pose2 preserves authoritative state and feet near ground. Network25 uses four independent local processes and checks guest crouch/noise/eye height and stand/stop alongside paid purchases, shot/retrieval/sale and rejoin. Not a new real-machine result.
+
+The earned full route passes17 with normal gear/resources, real movement and shots:75.709seconds,373credits,eight rounds,health100,max step0.115727m. Rules31/services12/storage10/behavior10/charge11/navigation15 also pass. An older behavior fixture treated stationary sprint input as loud; it now actually runs. Quiet scent evaluation allows more time for the lower suspicion rate. Failed intermediate logs remain local and are excluded. Human difficulty, stalking satisfaction and reward balance remain open.
+
+Native staged views cover720p/1080p at120% HUD. Final720 noise text and standing/crouched third-person views were inspected; the initial shortened-leg pose looked sunk, so joints, boot height and coat clearance were corrected. Final cosmetic pose can still be refined. Six-second1080p camp sample before final jointed legs:341frames,median17.591ms,p9519.058,p9919.684,1408drawcalls. Not sustained60FPS or co-op combat performance. Exact export/platform and archive receipts follow sealing. Native Windows/Intel, clean installs, new home-Wi-Fi hunting, audio quality and long-session play remain unverified.
+
+**Next:** HUNT-13/14 early quiet gear, scent cover and a muffled barrel with shot-distance falloff and local impact consequences; then changing wind/freeze-to-calm/herd cues. HUNT-06 original character/story remains planned. Keep the arcade tone, original artwork and explicit shared party economy. No purchases, publication, public hosting, security/network changes or owner-save edits occurred. Local evidence stays ignored; no new evidence was committed.
+
+Final0b42788 Mac export passes strict ad-hoc signature and native arm64 menu/solo rendering; both final captures were inspected and logs have no ERROR/WARNING. Five packaging metadata tests pass. Source packaging now excludes ignored local evidence, tools and exports, consistent with repository policy; verification receipts remain local. Archive integrity is appended after sealing.
+
+Sealed v0.1.3: all three ZIPs pass CRC. Mac bundle includes arm64/x86_64 and matching0.1.3 versions; exact native arm64 launch is verified. Windows x86_64 PE/embedded-pack structure passes, and its resources load in an isolated directory through Mac Godot; native Windows remains untested. Exact source matches all49 frozen runtime files and fresh-imports with Godot4.5.2, exit0. The source archive omits local evidence and includes documentation checkpoint106625e; this receipt was added afterward. SHA-256:
+
+- How_To_Hunt_Windows_v0_1_3.zip: `f9e235bbfa98c04b1dfb627063c53afa27a6885b67194618c046efa7ce641b1e`
+- How_To_Hunt_Mac_v0_1_3.zip: `32ed4f87f2d515a158f8dd8dad5837c7e6a10cc54490f3df2a03457b65df77fd`
+- How_To_Hunt_Source_v0_1_3.zip: `4a7e5050e55cea48e72c253bf89992996336a116332bb1f2121ae5002e1c7ea7`
+
+---
+
 # Development checkpoint — session and economy extraction, 2026-09-08
 
 Current branch `codex/hunting-services`, source **0.1.3-dev**. Latest packaged playtest remains0.1.2; its archives are unchanged. This is source progress, not a new exported release or completed game. Protocol1 and schema1 remain unchanged; the development version rejects mixed release clients.

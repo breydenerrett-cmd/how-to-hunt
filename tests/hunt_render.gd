@@ -12,6 +12,8 @@ func run() -> void:
  await capture("menu")
  game.start_host(false,"Render fixture",991234);game.set_physics_process(false);game.ui_scale=1.2
  await capture("camp")
+ var hunter=game.avatars[1];hunter.crouched=true;hunter.eye_height=1.05;hunter.noise=.15;hunter.surface_name="trail";await capture("crouch_hud")
+ hunter.crouched=false;hunter.eye_height=1.58;hunter.noise=0
  var a=game.avatars[1];a.position=game.C.SHOP+Vector3(0,0,3);a.previous_position=a.position;game.yaw=0;game.pitch=-.1
  await capture("lodge")
  game.buy(a,"rifle");game.ui.show_panel("shop","scope");await capture("purchase");game.ui.panel.hide()

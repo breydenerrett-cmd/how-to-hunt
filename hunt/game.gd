@@ -11,6 +11,7 @@ const Wire=preload("res://scripts/snapshot_wire.gd")
 const Gate=preload("res://scripts/action_gate.gd")
 const Session=preload("res://hunt/session.gd")
 const Economy=preload("res://hunt/economy.gd")
+const Stealth=preload("res://hunt/stealth.gd")
 const Sound=preload("res://scripts/sound.gd")
 var shutting_down=false
 var accepted_sessions=0
@@ -74,10 +75,12 @@ func _ready() -> void:
   if arg.begins_with("--join="):start_join(arg.trim_prefix("--join="),"Guest")
  print("HUNT_BOOT ",C.VERSION," renderer=",RenderingServer.get_current_rendering_method())
 func setup_inputs() -> void:
- var keys={"left":KEY_A,"right":KEY_D,"forward":KEY_W,"back":KEY_S,"jump":KEY_SPACE,"sprint":KEY_SHIFT,"interact":KEY_E,"pickup":KEY_F,"drop":KEY_Q,"reload":KEY_R,"journal":KEY_TAB,"pause":KEY_ESCAPE}
+ var keys={"left":KEY_A,"right":KEY_D,"forward":KEY_W,"back":KEY_S,"jump":KEY_SPACE,"crouch":KEY_CTRL,"sprint":KEY_SHIFT,"interact":KEY_E,"pickup":KEY_F,"drop":KEY_Q,"reload":KEY_R,"journal":KEY_TAB,"pause":KEY_ESCAPE}
  for action in keys:
   if not InputMap.has_action(action):InputMap.add_action(action)
   var ev=InputEventKey.new();ev.physical_keycode=keys[action];InputMap.action_add_event(action,ev)
+ # C is an alternative for keyboards where Ctrl-click is reserved by the desktop.
+ var crouch_key=InputEventKey.new();crouch_key.physical_keycode=KEY_C;InputMap.action_add_event("crouch",crouch_key)
 func load_settings() -> void:
  var f=ConfigFile.new()
  if f.load("user://settings.cfg")==OK:motion=clampf(float(f.get_value("controls","motion",.65)),0,1);ui_scale=clampf(float(f.get_value("controls","ui_scale",1)),1,1.2)
@@ -153,11 +156,12 @@ func _physics_process(dt:float) -> void:
  if bot_mode.is_empty():
   var enabled=not ui.panel.visible and capture_path.is_empty()
   var aim=Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and enabled
-  submit_input(Input.get_vector("left","right","forward","back")*(.5 if aim else 1.0) if enabled else Vector2.ZERO,yaw,pitch,Input.is_action_pressed("jump") and enabled,Input.is_action_pressed("sprint") and enabled and not aim,aim)
+  submit_input(Input.get_vector("left","right","forward","back")*(.5 if aim else 1.0) if enabled else Vector2.ZERO,yaw,pitch,Input.is_action_pressed("jump") and enabled,Input.is_action_pressed("sprint") and enabled and not aim,aim,Input.is_action_pressed("crouch") and enabled)
  if not is_host:return
  for a in avatars.values():
-  if clock-a.last_input>.6:a.input_move=Vector2.ZERO;a.input_sprint=false;a.input_reel=false
+  if clock-a.last_input>.6:a.input_move=Vector2.ZERO;a.input_sprint=false;a.input_reel=false;a.input_crouch=false
   a.server_step(dt,a.held>=0,.25 if "pack" in progress.upgrades else 0.0,false)
+  a.surface_name=Stealth.surface_at(a.position);a.noise=Stealth.movement_noise(a)
   var gain=1.54 if "scope" in progress.upgrades else 1.0
   a.fishing.steady=clampf(float(a.fishing.get("steady",0))+dt*gain if a.input_reel and a.visual_speed<2.4 else 0,0,1)
   if a.reload_until>0 and clock>=a.reload_until:a.magazines.rifle=mini(4,int(progress.ammo));a.reload_until=0
@@ -184,30 +188,30 @@ func _process(dt:float) -> void:
   var a=avatars.get(local_id)
   if a:
    var p=a.rendered_position() if is_host else a.position
-   camera.position=p+Vector3(0,1.58 if a.health>0 else .5,0);camera.rotation=Vector3(pitch,yaw,0)
+   camera.position=p+Vector3(0,a.eye_height if a.health>0 else .5,0);camera.rotation=Vector3(pitch,yaw,0)
    camera.fov=lerpf(camera.fov,50.0 if a.input_reel and "scope" in progress.upgrades else (64.0 if a.input_reel else 82.0),1-exp(-9*dt))
    gun.visible="rifle" in progress.upgrades and a.held<0 and a.health>0
    gun.position=gun.position.lerp(Vector3(.04,-.28,-.92) if a.input_reel else Vector3(.3,-.32,-.80),1-exp(-10*dt))
    gun.rotation=Vector3(recoil*.19+(-.45 if a.reload_until>clock else 0),0,sin(clock*2)*.008*motion)
    gun.presentation(a.reload_until>clock,clock,"scope" in progress.upgrades,motion)
    footstep+=dt
-   if a.visual_speed>.4 and footstep>(.30 if a.input_sprint else .48):sound.tone("step");footstep=0
+   if a.visual_speed>.4 and footstep>(.70 if a.crouched else (.30 if a.input_sprint else .48)):sound.tone("step",maxf(.12,a.noise));footstep=0
  ui.update(dt)
  if not capture_path.is_empty():
   capture_elapsed+=dt
   if capture_elapsed>4 and DisplayServer.get_name()!="headless":
    get_viewport().get_texture().get_image().save_png(capture_path);print("HUNT_CAPTURE ",capture_path);capture_path=""
    if "--capture-quit" in OS.get_cmdline_user_args():shutdown()
-func submit_input(move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool) -> void:
+func submit_input(move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool,crouch:bool=false) -> void:
  next_sequence+=1
- if is_host:accept_input(local_id,next_sequence,move,y,p,jump,sprint,aim)
- elif active:player_input.rpc_id(1,next_sequence,move,y,p,jump,sprint,aim)
+ if is_host:accept_input(local_id,next_sequence,move,y,p,jump,sprint,aim,crouch)
+ elif active:player_input.rpc_id(1,next_sequence,move,y,p,jump,sprint,aim,crouch)
 @rpc("any_peer","call_remote","unreliable_ordered",1)
-func player_input(seq:int,move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool) -> void:
- if is_host:accept_input(multiplayer.get_remote_sender_id(),seq,move,y,p,jump,sprint,aim)
-func accept_input(id:int,seq:int,move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool) -> void:
+func player_input(seq:int,move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool,crouch:bool=false) -> void:
+ if is_host:accept_input(multiplayer.get_remote_sender_id(),seq,move,y,p,jump,sprint,aim,crouch)
+func accept_input(id:int,seq:int,move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool,crouch:bool=false) -> void:
  if not avatars.has(id) or seq<=int(last_inputs.get(id,-1)) or not move.is_finite() or not is_finite(y) or not is_finite(p):return
- last_inputs[id]=seq;var a=avatars[id];a.input_move=move.limit_length(1);a.input_yaw=wrapf(y,-PI,PI);a.input_pitch=clampf(p,-1.3,1.3);a.input_jump=a.input_jump or jump;a.input_sprint=sprint;a.input_reel=aim;a.last_input=clock
+ last_inputs[id]=seq;var a=avatars[id];a.input_move=move.limit_length(1);a.input_yaw=wrapf(y,-PI,PI);a.input_pitch=clampf(p,-1.3,1.3);a.input_jump=a.input_jump or jump;a.input_sprint=sprint;a.input_reel=aim;a.input_crouch=crouch;a.last_input=clock
 func state_packet() -> Dictionary:
  revision+=1;var players=[];var wildlife=[]
  for a in avatars.values():players.append(a.packet())
@@ -223,7 +227,7 @@ func apply_state(packet:Dictionary) -> void:
  if int(packet.revision)<=last_revision:return
  last_revision=int(packet.revision);progress=packet.progress;var ids=[]
  for d in packet.players:
-  var id=int(d.id);ids.append(id);var a=add_avatar(id,d.name);a.target_position=d.p;a.target_yaw=d.yaw;a.health=d.hp;a.held=int(d.held);a.visual_speed=d.speed;a.fishing=d.fish;a.magazines=d.magazines
+  var id=int(d.id);ids.append(id);var a=add_avatar(id,d.name);a.target_position=d.p;a.target_yaw=d.yaw;a.health=d.hp;a.held=int(d.held);a.visual_speed=d.speed;a.fishing=d.fish;a.magazines=d.magazines;a.crouched=bool(d.crouched);a.noise=float(d.noise);a.surface_name=str(d.surface);a.eye_height=float(d.eye_height)
   # Reload remaining time is derived from a duration in future revisions; current packet uses a host-relative hint only.
   a.reload_until=clock+.1 if float(d.reload_until)>0 else 0
   if id==local_id:a.input_reel=Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and not ui.panel.visible;a.body_root.hide();a.name_label.hide()
@@ -267,7 +271,7 @@ func fire(a:Node3D) -> void:
  if "rifle" not in progress.upgrades or a.held>=0 or a.reload_until>clock or clock<a.next_shot:return
  if int(a.magazines.get("rifle",0))<=0 or int(progress.ammo)<=0:note(a.peer_id,"Empty. [R] reload, or visit camp for ammunition.","error");return
  a.next_shot=clock+(.52 if "rifle2" in progress.upgrades else .87);a.magazines.rifle-=1;progress.ammo-=1
- var origin=a.position+Vector3.UP*1.58;var direction=Basis.from_euler(Vector3(a.input_pitch,a.input_yaw,0))*Vector3.FORWARD
+ var origin=a.position+Vector3.UP*a.eye_height;var direction=Basis.from_euler(Vector3(a.input_pitch,a.input_yaw,0))*Vector3.FORWARD
  var query=PhysicsRayQueryParameters3D.create(origin,origin+direction*85,5);query.collide_with_areas=true;var result=get_world_3d().direct_space_state.intersect_ray(query)
  var end=origin+direction*85 if result.is_empty() else result.position
  shot_fx(origin,end)

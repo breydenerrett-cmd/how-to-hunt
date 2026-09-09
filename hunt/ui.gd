@@ -9,6 +9,8 @@ var menu_status:Label
 var header:Label
 var objective:Label
 var status:Label
+var noise_label:Label
+var noise_bar:ProgressBar
 var prompt:Label
 var message:Label
 var ammo:Label
@@ -31,7 +33,7 @@ func button(parent:Node,value:String,callback:Callable) -> Button:
 func _ready() -> void:
  root=Control.new();add_child(root);root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);root.mouse_filter=Control.MOUSE_FILTER_IGNORE
  var left=box(root,Vector4(22,20,590,110));var rows=VBoxContainer.new();left.add_child(rows);header=label(rows,"",17,Color("c2bb92"));objective=label(rows,"",20)
- var right=box(root,Vector4(-250,20,-22,98),Vector4(1,0,1,0));status=label(right,"",17)
+ var right=box(root,Vector4(-250,20,-22,98),Vector4(1,0,1,0));var status_rows=VBoxContainer.new();right.add_child(status_rows);status=label(status_rows,"",17);noise_label=label(status_rows,"",14);noise_bar=ProgressBar.new();status_rows.add_child(noise_bar);noise_bar.custom_minimum_size.y=8;noise_bar.show_percentage=false
  var lower=box(root,Vector4(22,-125,405,-22),Vector4(0,1,0,1));ammo=label(lower,"",17)
  var center=Control.new();root.add_child(center);center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);center.mouse_filter=Control.MOUSE_FILTER_IGNORE
  aim=label(center,"·",27);aim.set_anchors_and_offsets_preset(Control.PRESET_CENTER);aim.position-=Vector2(5,18);aim.size=Vector2(190,70)
@@ -69,8 +71,8 @@ func show_panel(kind:String,id:String="") -> void:
   button(v,"ALL EQUIPMENT",func():show_panel("shop"))
  else:
   label(v,"FIELD JOURNAL",29);label(v,C.objective(game.progress),20)
-  label(v,"WASD move • Shift run • Space jump\nRight mouse: slow, steady aim\nLeft mouse: fire • R reload\nE inspect tracks / shop / sell\nF retrieve • Q put down\nTab journal • Esc pause",18)
-  label(v,"Gold hoofprints guide the hunt. Moving fast and approaching upwind raises suspicion. One clean steady shot earns 25% more; follow the trail if your quarry runs. Bank two deer to unlock the Crownback contract. Dodge its orange rush lane, then fire during recovery for full damage.",18)
+  label(v,"WASD move • Shift run • Space jump\nHold Ctrl or C: crouch / stalk\nRight mouse: slow, steady aim\nLeft mouse: fire • R reload\nE inspect tracks / shop / sell\nF retrieve • Q put down\nTab journal • Esc pause",18)
+  label(v,"Gold hoofprints guide the hunt. Hold Ctrl or C to stalk quietly. The NOISE meter reflects movement and trail or leaf litter underfoot. Quiet is not invisible: line of sight and upwind scent still reveal you. Moving fast and approaching upwind raises suspicion. One clean steady shot earns 25% more; follow the trail if your quarry runs. Bank two deer to unlock the Crownback contract. Dodge its orange rush lane, then fire during recovery for full damage.",18)
   button(v,"REDUCED MOTION: "+("ON" if game.motion==0 else "OFF"),func():game.motion=0.0 if game.motion>0 else .65;game.save_settings();show_panel("journal"))
   button(v,"TEXT SIZE: "+("LARGE" if game.ui_scale>1 else "NORMAL"),func():game.ui_scale=1.0 if game.ui_scale>1 else 1.2;game.save_settings();show_panel("journal"))
   button(v,"SAVE & RETURN TO MENU",func():game.end_session())
@@ -79,6 +81,7 @@ func update(dt:float) -> void:
  for node in hud_nodes:node.visible=game.active
  notice_time=maxf(0,notice_time-dt);message.visible=notice_time>0
  if panel.visible and panel_kind=="shop" and shop_revision!=str(game.progress.wallet)+str(game.progress.upgrades):show_panel("shop",focused_item)
+ noise_label.add_theme_font_size_override("font_size",int(14*game.ui_scale))
  for n in [header,objective,status,prompt,ammo]:n.add_theme_font_size_override("font_size",int((20 if n==objective else 17)*game.ui_scale))
  header.text="PINEFALL • %d HUNTERS • %d CREDITS"%[game.avatars.size(),int(game.progress.wallet)]
  objective.text=C.objective(game.progress)
@@ -87,6 +90,9 @@ func update(dt:float) -> void:
  prompt.text=game.context_prompt() if game.active else ""
  aim.visible=game.active and not panel.visible
  if a:
+  noise_label.text=("CROUCHED" if a.crouched else "STANDING")+" • NOISE %d%%\n%s"%[int(a.noise*100),a.surface_name]
+  noise_bar.value=a.noise*100
+  noise_bar.modulate=Color("8ebc8c") if a.noise<.3 else (Color("e1c271") if a.noise<.65 else Color("e98d65"))
   var steady=float(a.fishing.get("steady",0))
   aim.text="+" if not a.input_reel else ("•" if steady>.85 else "◌")
   aim.add_theme_color_override("font_color",Color("e9ce88") if steady>.85 else Color("eee8d9"))
