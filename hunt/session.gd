@@ -37,7 +37,11 @@ static func peer_left(game:Node,id:int) -> void:
  if game.avatars.has(id):game.drop(game.avatars[id]);game.avatars[id].queue_free();game.avatars.erase(id)
  game.last_commands.erase(id);game.last_inputs.erase(id);game.save_progress()
 static func end_session(game:Node,reason:String="Hunt saved. Your camp will be waiting.") -> void:
- if game.active and game.is_host:game.save_progress()
+ # save_progress reports failures through a note, which this teardown then destroys, so
+ # the player was told "Hunt saved" precisely when it had not been.
+ var stored=true
+ if game.active and game.is_host:stored=game.save_progress()
+ if not stored:reason="Your hunt could NOT be saved. "+game.store.last_error
  game.active=false;game.is_host=false;game.online=false;game.join_started=-1;game.trail_history_received=false;game.forest.reset_tracks();game.multiplayer.multiplayer_peer=OfflineMultiplayerPeer.new()
  for a in game.avatars.values():a.queue_free()
  for a in game.animals.values():a.queue_free()

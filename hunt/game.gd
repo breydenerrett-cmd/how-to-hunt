@@ -51,6 +51,12 @@ var test_mode=false
 var bot_mode=""
 var capture_path=""
 var capture_elapsed=0.0
+const PAD_LOOK_SPEED:=3.1
+var pad_invert_y=false
+# Hold-to-aim needs a sustained right click, which is miserable on a trackpad: a two-finger
+# press held down while the same surface is dragged to look. Toggle mode makes aim a state.
+var aim_toggle=false
+var aim_latched=false
 var footstep=0.0
 var tracked_id=-1
 var tracked_until=0.0
@@ -82,12 +88,37 @@ func setup_inputs() -> void:
   var ev=InputEventKey.new();ev.physical_keycode=keys[action];InputMap.action_add_event(action,ev)
  # C is an alternative for keyboards where Ctrl-click is reserved by the desktop.
  var crouch_key=InputEventKey.new();crouch_key.physical_keycode=KEY_C;InputMap.action_add_event("crouch",crouch_key)
+ # Fire and aim used to be read straight off the mouse, which made them the only two verbs
+ # a controller could never reach. As actions, any device can drive them.
+ bind_mouse("fire",MOUSE_BUTTON_LEFT);bind_mouse("aim",MOUSE_BUTTON_RIGHT)
+ # Standard twin-stick layout: triggers shoot and steady, left stick moves, right stick looks.
+ bind_axis("fire",JOY_AXIS_TRIGGER_RIGHT,1.0);bind_axis("aim",JOY_AXIS_TRIGGER_LEFT,1.0)
+ bind_axis("forward",JOY_AXIS_LEFT_Y,-1.0);bind_axis("back",JOY_AXIS_LEFT_Y,1.0)
+ bind_axis("left",JOY_AXIS_LEFT_X,-1.0);bind_axis("right",JOY_AXIS_LEFT_X,1.0)
+ bind_axis("look_left",JOY_AXIS_RIGHT_X,-1.0);bind_axis("look_right",JOY_AXIS_RIGHT_X,1.0)
+ bind_axis("look_up",JOY_AXIS_RIGHT_Y,-1.0);bind_axis("look_down",JOY_AXIS_RIGHT_Y,1.0)
+ bind_button("jump",JOY_BUTTON_A);bind_button("crouch",JOY_BUTTON_B)
+ bind_button("reload",JOY_BUTTON_X);bind_button("interact",JOY_BUTTON_Y)
+ bind_button("pickup",JOY_BUTTON_RIGHT_SHOULDER);bind_button("drop",JOY_BUTTON_LEFT_SHOULDER)
+ bind_button("sprint",JOY_BUTTON_LEFT_STICK)
+ bind_button("pause",JOY_BUTTON_START);bind_button("journal",JOY_BUTTON_BACK)
+ # The 0.5 default deadzone is far too coarse for aiming; looking needs finer still.
+ for action in ["forward","back","left","right"]:InputMap.action_set_deadzone(action,.20)
+ for action in ["look_left","look_right","look_up","look_down"]:InputMap.action_set_deadzone(action,.14)
+func ensure_action(action:String) -> void:
+ if not InputMap.has_action(action):InputMap.add_action(action)
+func bind_button(action:String,button:int) -> void:
+ ensure_action(action);var e=InputEventJoypadButton.new();e.button_index=button;InputMap.action_add_event(action,e)
+func bind_axis(action:String,axis:int,value:float) -> void:
+ ensure_action(action);var e=InputEventJoypadMotion.new();e.axis=axis;e.axis_value=value;InputMap.action_add_event(action,e)
+func bind_mouse(action:String,button:int) -> void:
+ ensure_action(action);var e=InputEventMouseButton.new();e.button_index=button;InputMap.action_add_event(action,e)
 func load_settings() -> void:
  var f=ConfigFile.new()
- if f.load("user://settings.cfg")==OK:motion=clampf(float(f.get_value("controls","motion",.65)),0,1);ui_scale=clampf(float(f.get_value("controls","ui_scale",1)),1,1.2)
+ if f.load("user://settings.cfg")==OK:motion=clampf(float(f.get_value("controls","motion",.65)),0,1);ui_scale=clampf(float(f.get_value("controls","ui_scale",1)),1,1.2);pad_invert_y=bool(f.get_value("controls","pad_invert_y",false));aim_toggle=bool(f.get_value("controls","aim_toggle",false))
 func save_settings() -> void:
  if store.disabled:return
- var f=ConfigFile.new();f.set_value("controls","motion",motion);f.set_value("controls","ui_scale",ui_scale);f.save("user://settings.cfg")
+ var f=ConfigFile.new();f.set_value("controls","motion",motion);f.set_value("controls","ui_scale",ui_scale);f.set_value("controls","pad_invert_y",pad_invert_y);f.set_value("controls","aim_toggle",aim_toggle);f.save("user://settings.cfg")
 func start_host(networked:bool,player_name:String,slot:int) -> void:
  Session.start_host(self,networked,player_name,slot)
 func start_join(address:String,player_name:String) -> void:
@@ -113,7 +144,7 @@ func receive_trail_history(history:Array) -> void:
 func clean_name(value:String) -> String:
  var s=value.strip_edges().replace("\n","").replace("\r","").left(20);return "Ranger" if s.is_empty() else s
 func begin_view() -> void:
- yaw=0;pitch=-.08;ui.in_game()
+ yaw=0;pitch=-.08;aim_latched=false;ui.in_game()
  if avatars.has(local_id):avatars[local_id].body_root.hide();avatars[local_id].name_label.hide()
 func add_avatar(id:int,label:String) -> Node3D:
  if avatars.has(id):return avatars[id]
@@ -123,7 +154,12 @@ func seed_animals() -> void:
   var positions=[Vector2(5,-5),Vector2(-16,-28),Vector2(26,-52),Vector2(-30,-62),Vector2(2,-79)]
   var p:Vector2=positions[i];spawn_animal(forest.point(p.x,p.y)+Vector3.UP*.1,.90+i*.11)
 func spawn_animal(p:Vector3,size_value:float=1.0,elite:bool=false,id:int=-1) -> Node3D:
- if id<0:progress.sequence=int(progress.sequence)+1;id=int(progress.sequence)
+ if id<0:
+  progress.sequence=int(progress.sequence)+1;id=int(progress.sequence)
+  # Nothing guarantees a loaded world's sequence is above every id it restored, and the
+  # dictionary write below would silently replace a live animal, leaving its node in the
+  # tree still simulating while guests keep rendering the id as the new one.
+  while animals.has(id):progress.sequence=int(progress.sequence)+1;id=int(progress.sequence)
  var animal=Deer.new();animal.entity_id=id;animal.authority=is_host;animal.size_factor=size_value;animal.elite=elite;animal.hp=160.0 if elite else 70.0;animal.base_value=150 if elite else int(35*size_value*size_value);animal.position=p;add_child(animal);animals[id]=animal;return animal
 func peer_left(id:int) -> void:
  Session.peer_left(self,id)
@@ -147,8 +183,8 @@ func _unhandled_input(event:InputEvent) -> void:
  if ui.panel.visible:return
  if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
   yaw-=event.relative.x*.0023;pitch=clampf(pitch-event.relative.y*.0023,-1.3,1.3)
- if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:send_action("fire",{})
- for action in ["interact","pickup","reload"]:
+ if aim_toggle and event.is_action_pressed("aim"):aim_latched=not aim_latched
+ for action in ["fire","interact","pickup","reload"]:
   if event.is_action_pressed(action):send_action(action,{})
  if event.is_action_pressed("drop"):send_action("drop",{})
 func _physics_process(dt:float) -> void:
@@ -156,7 +192,7 @@ func _physics_process(dt:float) -> void:
  if not active:return
  if bot_mode.is_empty():
   var enabled=not ui.panel.visible and capture_path.is_empty()
-  var aim=Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and enabled
+  var aim=aim_active() and enabled
   submit_input(Input.get_vector("left","right","forward","back")*(.5 if aim else 1.0) if enabled else Vector2.ZERO,yaw,pitch,Input.is_action_pressed("jump") and enabled,Input.is_action_pressed("sprint") and enabled and not aim,aim,Input.is_action_pressed("crouch") and enabled)
  if not is_host:return
  for a in avatars.values():
@@ -188,6 +224,8 @@ func _process(dt:float) -> void:
   for animal in animals.values():animal.visual_step(dt,motion)
   var a=avatars.get(local_id)
   if a:
+   if a.health<=0 or a.held>=0:aim_latched=false
+   stick_look(dt,a)
    var p=a.rendered_position() if is_host else a.position
    camera.position=p+Vector3(0,a.eye_height if a.health>0 else .5,0);camera.rotation=Vector3(pitch,yaw,0)
    camera.fov=lerpf(camera.fov,50.0 if a.input_reel and "scope" in progress.upgrades else (64.0 if a.input_reel else 82.0),1-exp(-9*dt))
@@ -204,6 +242,20 @@ func _process(dt:float) -> void:
    RenderingServer.force_draw() # Also supports minimized, disposable capture sessions.
    get_viewport().get_texture().get_image().save_png(capture_path);print("HUNT_CAPTURE ",capture_path);capture_path=""
    if "--capture-quit" in OS.get_cmdline_user_args():shutdown()
+func aim_active() -> bool:
+ if ui.panel.visible:return false
+ return aim_latched if aim_toggle else Input.is_action_pressed("aim")
+func stick_look(dt:float,a:Node3D) -> void:
+ if not bot_mode.is_empty() or not capture_path.is_empty() or ui.panel.visible:return
+ var look=Input.get_vector("look_left","look_right","look_up","look_down")
+ if look.is_zero_approx():return
+ # Squaring the magnitude keeps small stick movements fine-grained while still allowing a
+ # fast sweep at full deflection. One stick has to both scan a treeline and hold on a deer.
+ var scaled=look*look.length()
+ # Steadying the rifle slows the turn, matching what the aim does to movement speed.
+ var speed=PAD_LOOK_SPEED*(.45 if a.input_reel else 1.0)
+ yaw=wrapf(yaw-scaled.x*speed*dt,-PI,PI)
+ pitch=clampf(pitch-scaled.y*speed*dt*(-1.0 if pad_invert_y else 1.0),-1.3,1.3)
 func submit_input(move:Vector2,y:float,p:float,jump:bool,sprint:bool,aim:bool,crouch:bool=false) -> void:
  next_sequence+=1
  if is_host:accept_input(local_id,next_sequence,move,y,p,jump,sprint,aim,crouch)
@@ -232,7 +284,7 @@ func apply_state(packet:Dictionary) -> void:
   var id=int(d.id);ids.append(id);var a=add_avatar(id,d.name);a.target_position=d.p;a.target_yaw=d.yaw;a.health=d.hp;a.held=int(d.held);a.visual_speed=d.speed;a.fishing=d.fish;a.magazines=d.magazines;a.crouched=bool(d.crouched);a.noise=float(d.noise);a.surface_name=str(d.surface);a.eye_height=float(d.eye_height);a.input_yaw=float(d.get("input_yaw",d.yaw))
   # Reload remaining time is derived from a duration in future revisions; current packet uses a host-relative hint only.
   a.reload_until=clock+.1 if float(d.reload_until)>0 else 0
-  if id==local_id:a.input_reel=Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and not ui.panel.visible;a.body_root.hide();a.name_label.hide()
+  if id==local_id:a.input_reel=aim_active();a.body_root.hide();a.name_label.hide()
  for id in avatars.keys():
   if id not in ids:avatars[id].queue_free();avatars.erase(id)
  ids=[]

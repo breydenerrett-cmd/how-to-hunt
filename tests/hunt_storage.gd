@@ -32,5 +32,19 @@ func _initialize() -> void:
  var backup_text=backup.get_as_text();backup.close()
  check(JSON.parse_string(backup_text)!=null,"corrupt primary is not copied over the recovery copy")
  check(s.load_world().wallet==93,"repaired primary loads the newest state")
+ # Schema reach. The old ceilings described the first prototype exactly, so any new
+ # species, region or contract could not be saved. Widening must admit that content
+ # without rejecting worlds written before the fields existed.
+ var legacy={"schema":1,"game":"how_to_hunt","wallet":40,"upgrades":[],"ammo":0,"sold":0,"banked":0,"contract":0,"sequence":0,"animals":[]}
+ check(C.valid_progress(legacy),"a world written before the new fields still loads")
+ var modern=legacy.duplicate(true);modern.stage=3;modern.region=2;modern.contract=9
+ modern.animals=[{"id":1,"p":[0,0,0],"size":2.4,"hp":400,"shots":0,"value":1800,"elite":true,"kind":"elk"}]
+ check(C.valid_progress(modern),"a tagged species beyond the old size, hp and value ceilings saves")
+ var bad_stage=modern.duplicate(true);bad_stage.stage=-1
+ check(not C.valid_progress(bad_stage),"a negative narrative stage is still rejected")
+ var bad_kind=modern.duplicate(true);bad_kind.animals=[{"id":1,"p":[0,0,0],"size":1.0,"hp":70,"shots":0,"value":35,"elite":false,"kind":""}]
+ check(not C.valid_progress(bad_kind),"an empty species tag is still rejected")
+ var absurd=modern.duplicate(true);absurd.animals=[{"id":1,"p":[0,0,0],"size":9.0,"hp":70,"shots":0,"value":35,"elite":false}]
+ check(not C.valid_progress(absurd),"an impossible animal size is still rejected")
  for suffix in ["",".bak",".bak2",".tmp"]:DirAccess.remove_absolute(ProjectSettings.globalize_path(s.path()+suffix))
  print("TEST_SUMMARY hunt_storage passes=",passes," failures=",failures);quit(1 if failures else 0)

@@ -43,7 +43,13 @@ func _ready() -> void:
  var right=box(root,Vector4(-250,20,-22,98),Vector4(1,0,1,0));var status_rows=VBoxContainer.new();right.add_child(status_rows);status=label(status_rows,"",17);noise_label=label(status_rows,"",14);noise_bar=ProgressBar.new();status_rows.add_child(noise_bar);noise_bar.custom_minimum_size.y=8;noise_bar.show_percentage=false
  var lower=box(root,Vector4(22,-125,405,-22),Vector4(0,1,0,1));ammo=label(lower,"",17)
  var center=Control.new();root.add_child(center);center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);center.mouse_filter=Control.MOUSE_FILTER_IGNORE
- aim=label(center,"·",27,Color("eadfca"),true);aim.set_anchors_and_offsets_preset(Control.PRESET_CENTER);aim.position-=Vector2(5,18);aim.size=Vector2(190,70)
+ # The reticle marks where the shot goes, so it must sit on the camera axis exactly. It
+ # used to be a 190x70 box with default top-left text alignment nudged by a hand-tuned
+ # offset, which only lined up for one glyph: swapping between +, • and ◌ moved the mark
+ # while the player was trying to hold steady. Centring the text in a full-rect label puts
+ # the glyph on screen centre whatever its metrics.
+ aim=label(center,"·",27,Color("eadfca"),true);aim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ aim.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER;aim.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;aim.mouse_filter=Control.MOUSE_FILTER_IGNORE
  prompt=label(center,"",18,Color("eadfca"),true);prompt.anchor_left=.5;prompt.anchor_right=.5;prompt.anchor_top=1;prompt.anchor_bottom=1;prompt.offset_left=-290;prompt.offset_right=290;prompt.offset_top=-100;prompt.offset_bottom=-50;prompt.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  message=label(center,"",20,Color("f0d491"),true);message.anchor_left=.5;message.anchor_right=.5;message.anchor_top=.2;message.anchor_bottom=.2;message.offset_left=-310;message.offset_right=310;message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  hud_nodes=[left,right,lower,center]
@@ -82,9 +88,10 @@ func show_panel(kind:String,id:String="") -> void:
   for gear_id in ["boots","overshirt","scent","muffler"]:
    if gear_id in game.progress.upgrades:kit.append(C.ITEMS[gear_id].name)
   label(v,"STALKING KIT • "+(", ".join(kit) if not kit.is_empty() else "Available on the lodge side shelves"),16)
-  label(v,"WASD move • Shift run • Space jump\nHold Ctrl or C: crouch / stalk\nRight mouse: slow, steady aim\nLeft mouse: fire • R reload\nE inspect tracks / shop / sell\nF retrieve • Q put down\nTab journal • Esc pause",18)
+  label(v,"WASD move • Shift run • Space jump\nHold Ctrl or C: crouch / stalk\n%s: slow, steady aim\nLeft mouse: fire • R reload\nE inspect tracks / shop / sell\nF retrieve • Q put down\nTab journal • Esc pause\nController: sticks move and look, triggers aim and fire"%("Press right mouse to hold aim" if game.aim_toggle else "Hold right mouse"),18)
   label(v,"Gold hoofprints guide the hunt. Hold Ctrl or C to stalk quietly. The NOISE meter reflects movement and trail or leaf litter underfoot. Quiet is not invisible: line of sight and upwind scent still reveal you. Moving fast and approaching upwind raises suspicion. One clean steady shot earns 25% more; follow the trail if your quarry runs. Bank two deer to unlock the Crownback contract. Dodge its orange rush lane, then fire during recovery for full damage.",18)
   button(v,"REDUCED MOTION: "+("ON" if game.motion==0 else "OFF"),func():game.motion=0.0 if game.motion>0 else .65;game.save_settings();show_panel("journal"))
+  button(v,"AIM: "+("TOGGLE • best on a trackpad" if game.aim_toggle else "HOLD • best with a mouse"),func():game.aim_toggle=not game.aim_toggle;game.aim_latched=false;game.save_settings();show_panel("journal"))
   button(v,"TEXT SIZE: "+("LARGE" if game.ui_scale>1 else "NORMAL"),func():game.ui_scale=1.0 if game.ui_scale>1 else 1.2;game.save_settings();show_panel("journal"))
   button(v,"SAVE & RETURN TO MENU",func():game.end_session())
  button(v,"BACK TO HUNT",func():panel.hide();Input.mouse_mode=Input.MOUSE_MODE_CAPTURED)

@@ -30,6 +30,8 @@ Owner changed the goal on 2026-09-08 to a distinct arcade hunting game reusing t
 | HUNT-24 | Hauling looks like effort | No grip or hand contact; carcass is just positioned behind. | Two-handed grip, weight-scaled lean and stride, drag audio. |
 | HUNT-25 | Transport is a visible upgrade ladder | Hand dragging only. | Travois, handcart, pack animal, wagon. Introduce only after hauling pain is real. |
 | HUNT-26 | World labels never overlap the HUD | BUG: CROWNBACK RIDGE overlaps the top-right panel. | Reserve HUD margins; scale and fade distant labels. Verify at 720p and 1080p. |
+| HUNT-38 | Save validation no longer blocks new content | RESOLVED 2026-09-09. Ceilings were contract 2, animals 12, size 1.7, hp 180, value 500 — the first prototype's exact shape, so every new species, region and contract was unsaveable. |
+| HUNT-39 | Controller and trackpad play | Xbox/PlayStation layout, analog look, and a HOLD/TOGGLE aim setting are in. | Remaining: prompts still name keyboard keys, menus are not stick-navigable, no rebinding screen. |
 
 Latest0.1.1: HUNT-02 static routes/scent/alert/committed rush and counterattack are implemented;113 selected checks. HUNT-04 bounded trail bootstrap/rejoin is implemented. Human balance and dynamic navigation remain open.
 
@@ -44,3 +46,10 @@ Latest0.1.4 implements HUNT-13/14 with140 selected assertions and earned multipl
 Latest0.1.5 implements the first HUNT-17/18 lighting/material pass; original geometry and foliage still need refinement. Next bounded session: fix HUNT-21 hauling-camera obstruction and HUNT-26 landmark/HUD overlap, with actual captures and authoritative retrieval/sale regressions. HUNT-15/16 changing wind/herd awareness and HUNT-06 opening story remain planned. Preserve actual footsteps, collision, hitbox and reward tests. Keep the original arcade tone; avoid heavy survival chores until hunting is enjoyable.
 
 Hourly continuation uses the existing task automation. Keep meaningful milestone/failure/input notifications only, and avoid overlapping implementation or owner gameplay. The broader hunting goal remains active.
+
+Schema note for the next session: `Catalog.valid_progress` now admits 32 contracts, 40 animals,
+size to 3.2, 900 hp, 4000 value, an optional per-animal `kind` species tag, and optional
+`stage`/`region` fields. The schema number stays 1 and no migration is needed — worlds written
+before these fields still load, and `REQUIRED` names the original keys explicitly so adding a
+further optional field cannot reject an older world. Species, regions and contracts are
+unblocked; add item ids freely, but never remove one.

@@ -1,5 +1,5 @@
 extends RefCounted
-const VERSION="0.1.6-hunt"
+const VERSION="0.1.7-hunt"
 const PROTOCOL=2
 const PORT=27951
 const CAMP=Vector3(0,0.15,26)
@@ -18,13 +18,25 @@ const ITEMS={
 }
 static func new_progress() -> Dictionary:
  return {"schema":1,"game":"how_to_hunt","wallet":40,"upgrades":[],"ammo":0,"sold":0,"banked":0,"contract":0,"sequence":0,"animals":[]}
+## Keys every save must carry. Checked instead of new_progress().keys() so that adding an
+## optional field later cannot reject worlds written before it existed.
+const REQUIRED:=["schema","game","wallet","upgrades","ammo","sold","banked","contract","sequence","animals"]
+## Bounds are deliberately generous rather than snug against today's content. The previous
+## ceilings — two contracts, twelve animals, size 1.7, 180 hp, value 500 — described the
+## first prototype exactly, which meant any new species, region or contract was unsaveable
+## until this function changed. Validation is here to reject corruption, not to cap design.
 static func valid_progress(p:Variant) -> bool:
- if not p is Dictionary or not p.has_all(new_progress().keys()):return false
+ if not p is Dictionary or not p.has_all(REQUIRED):return false
  if p.schema!=1 or p.game!="how_to_hunt":return false
  for key in ["wallet","ammo","sold","banked","contract","sequence"]:
   var n=p[key]
   if typeof(n) not in [TYPE_INT,TYPE_FLOAT] or not is_finite(float(n)) or n<0 or n>100000000 or float(n)!=floorf(float(n)):return false
- if p.contract>2 or p.ammo>9999 or not p.upgrades is Array or not p.animals is Array or p.animals.size()>12:return false
+ if p.contract>32 or p.ammo>9999 or not p.upgrades is Array or not p.animals is Array or p.animals.size()>40:return false
+ # Optional narrative and region fields. Absent on older saves, so read through get().
+ for key in ["stage","region"]:
+  if p.has(key):
+   var value=p[key]
+   if typeof(value) not in [TYPE_INT,TYPE_FLOAT] or not is_finite(float(value)) or value<0 or value>512 or float(value)!=floorf(float(value)):return false
  var ids=[]
  for id in p.upgrades:
   if not id is String or not ITEMS.has(id) or id=="ammo" or id in ids:return false
@@ -39,7 +51,9 @@ static func valid_progress(p:Variant) -> bool:
    if typeof(n) not in [TYPE_INT,TYPE_FLOAT] or not is_finite(float(n)) or absf(n)>500:return false
   for key in ["size","hp","shots","value"]:
    if typeof(a[key]) not in [TYPE_INT,TYPE_FLOAT] or not is_finite(float(a[key])):return false
-  if a.size<0.8 or a.size>1.7 or a.hp<0 or a.hp>180 or a.shots<0 or a.shots>100 or a.value<0 or a.value>500 or not a.elite is bool:return false
+  if a.size<0.5 or a.size>3.2 or a.hp<0 or a.hp>900 or a.shots<0 or a.shots>100 or a.value<0 or a.value>4000 or not a.elite is bool:return false
+  # Species tag, absent on saves written while deer were the only wildlife.
+  if a.has("kind") and (not a.kind is String or a.kind.length()>32 or a.kind.is_empty()):return false
  return true
 static func objective(p:Dictionary) -> String:
  if "rifle" not in p.upgrades:return "1 / 4 • Visit the lodge and buy your trail rifle."
